@@ -93,8 +93,7 @@ def get_mac_ip(loaded=False):
         if loaded:
             display_mac_eth_ip.set(mac_eth_ip)
             start_button.config(state=NORMAL)
-            #reconnect_button.config(state=DISABLED)
-            mainloop()
+            update()
 
         return mac_eth_ip
 
@@ -105,19 +104,26 @@ def get_mac_ip(loaded=False):
         if loaded:
             start_button.config(state=DISABLED)
             reconnect_button.config(state=NORMAL)
+            display_mac_eth_ip.set(mac_eth_ip)
+            message.set("Ethernet cable not connected to Pi")
+            update()
 
         return mac_eth_ip
 
 def run_script():
     start_button.config(state=DISABLED)
-    message.set("Server running... Now continue PSI calibration on the Pi ")
-    #mainloop()
+    message.set("Server running... Now continue PSI calibration on the Pi")
+    update()
     while True:
         (width, desiredWidth, spsi, ppmm, margin, pi_eth_ip) = read_from_pi(TCP_PORT, BUFFER_SIZE)
         offset_list = psi_cal(width, desiredWidth, spsi, ppmm, margin)
         send_to_pi(pi_eth_ip, TCP_PORT, offset_list)
 
-#if __name__ == '__main__':
+def update_message_label(mes):
+    message.set(mes)
+    mainloop()
+
+
 TCP_PORT = 5050
 BUFFER_SIZE = 1024
 
