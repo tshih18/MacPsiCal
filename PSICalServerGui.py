@@ -30,6 +30,7 @@ def read_from_pi(TCP_PORT, BUFFER_SIZE):
     clientsocket.close()
     # print "Data:", data
 
+    # Organize data into variables
     parameters = data.split(',')
     image = parameters[0]
     width = parameters[1]
@@ -72,13 +73,16 @@ def send_to_pi(TCP_IP, TCP_PORT, offset_list):
     clientSocket.close()
     print("Successfully sent data in", time.time() - start_time, "seconds")
 
+# Get mac's ethernet ip address
 def get_mac_ip(loaded=False):
+    # Run command to list connected hardware ports
     output = check_output(['networksetup', '-listallhardwareports'])
     output = output[1:-1]
     output = output.split('\n\n')
     device = ""
     mac_eth_ip = ""
 
+    # Grab the ethernet port number
     for port in output:
         port = port.split('\n')
         if "Ethernet" in port[0]:
@@ -86,10 +90,12 @@ def get_mac_ip(loaded=False):
             break
 
     try:
+        # Get the ip address associated with the ethernet port number
         mac_eth_ip = check_output(['ipconfig', 'getifaddr', device])[:-1]
         message.set("Click to start server")
         print("Ethernet cable connected to Pi")
 
+        # Display the ip and update GUI
         if loaded:
             display_mac_eth_ip.set(mac_eth_ip)
             start_button.config(state=NORMAL)
@@ -101,6 +107,7 @@ def get_mac_ip(loaded=False):
         print("Ethernet cable not connected to Pi")
         mac_eth_ip = "N/A"
 
+        # Display N/A and update GUI
         if loaded:
             start_button.config(state=DISABLED)
             reconnect_button.config(state=NORMAL)
@@ -110,6 +117,7 @@ def get_mac_ip(loaded=False):
 
         return mac_eth_ip
 
+# Runs the entire script when start is clicked
 def run_script():
     start_button.config(state=DISABLED)
     message.set("Server running... Now continue PSI calibration on the Pi")
@@ -118,11 +126,6 @@ def run_script():
         (width, desiredWidth, spsi, ppmm, margin, pi_eth_ip) = read_from_pi(TCP_PORT, BUFFER_SIZE)
         offset_list = psi_cal(width, desiredWidth, spsi, ppmm, margin)
         send_to_pi(pi_eth_ip, TCP_PORT, offset_list)
-
-def update_message_label(mes):
-    message.set(mes)
-    mainloop()
-
 
 TCP_PORT = 5050
 BUFFER_SIZE = 1024

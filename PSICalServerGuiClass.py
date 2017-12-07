@@ -15,16 +15,20 @@ class MainW(Tk):
         self.TCP_PORT = 5050
         self.BUFFER_SIZE = 1024
 
+        # Initialize messages to display to user
         self.message = StringVar()
         self.message.set("Click to start server")
 
+        # Initialize ip address variable
         self.display_mac_eth_ip = StringVar()
         self.mac_eth_ip = self.get_mac_ip()
         self.display_mac_eth_ip.set(self.mac_eth_ip)
 
+        # Setup layout of GUI
         self.InitFrames()
         self.PlaceFrames()
 
+        # Disable start button if no connection
         if self.mac_eth_ip == "N/A":
             self.message.set("Ethernet cable not connected to Pi")
             self.start_button.config(state=DISABLED)
@@ -48,6 +52,7 @@ class MainW(Tk):
         self.reconnect_button.pack()
         self.feedback.pack()
 
+    # Becomes server and gets the parameters and ip from pi
     def read_from_pi(self, TCP_PORT, BUFFER_SIZE):
         print("Starting socket connection")
         # create an INET, STREAMing socket
@@ -72,6 +77,7 @@ class MainW(Tk):
         clientsocket.close()
         # print "Data:", data
 
+        # Organize data into variables
         parameters = data.split(',')
         image = parameters[0]
         width = parameters[1]
@@ -91,6 +97,7 @@ class MainW(Tk):
 
         return (width, desiredWidth, spsi, ppmm, margin, pi_eth_ip)
 
+    # Run psi cal and get the values
     def psi_cal(self, width, desiredWidth, spsi, ppmm, margin):
         print("Running PSI Calibration Code...")
         start_time = time.time()
@@ -99,6 +106,7 @@ class MainW(Tk):
         print("Output:", offset_list)
         return offset_list
 
+    # Becomes client and sends the values back to the pi
     def send_to_pi(self, TCP_IP, TCP_PORT, offset_list):
         # format data to send to pi
         offset_list = offset_list[1:-2]
@@ -114,13 +122,16 @@ class MainW(Tk):
         clientSocket.close()
         print("Successfully sent data in", time.time() - start_time, "seconds")
 
+    # Get mac's ethernet ip address
     def get_mac_ip(self, loaded=False):
+        # Run command to list connected hardware ports
         self.output = check_output(['networksetup', '-listallhardwareports'])
         self.output = self.output[1:-1]
         self.output = self.output.split('\n\n')
         self.device = ""
         self.mac_eth_ip = ""
 
+        # Grab the ethernet port number
         for port in self.output:
             port = port.split('\n')
             if "Ethernet" in port[0]:
@@ -128,10 +139,12 @@ class MainW(Tk):
                 break
 
         try:
+            # Get the ip address associated with the ethernet port number
             self.mac_eth_ip = check_output(['ipconfig', 'getifaddr', self.device])[:-1]
             self.message.set("Click to start server")
             print("Ethernet cable connected to Pi")
 
+            # Display the ip and update GUI
             if loaded:
                 self.display_mac_eth_ip.set(self.mac_eth_ip)
                 self.start_button.config(state=NORMAL)
@@ -143,6 +156,7 @@ class MainW(Tk):
             print("Ethernet cable not connected to Pi")
             self.mac_eth_ip = "N/A"
 
+            # Display N/A and update GUI
             if loaded:
                 self.start_button.config(state=DISABLED)
                 self.reconnect_button.config(state=NORMAL)
@@ -152,6 +166,7 @@ class MainW(Tk):
 
             return self.mac_eth_ip
 
+    # Runs the entire script when start is clicked
     def run_script(self):
         self.start_button.config(state=DISABLED)
         self.message.set("Server running... Now continue PSI calibration on the Pi")
