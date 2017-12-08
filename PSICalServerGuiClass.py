@@ -21,18 +21,13 @@ class MainW(Tk):
 
         # Initialize ip address variable
         self.display_mac_eth_ip = StringVar()
-        self.mac_eth_ip = self.get_mac_ip()
-        self.display_mac_eth_ip.set(self.mac_eth_ip)
 
         # Setup layout of GUI
         self.InitFrames()
         self.PlaceFrames()
 
-        # Disable start button if no connection
-        if self.mac_eth_ip == "N/A":
-            self.message.set("Ethernet cable not connected to Pi")
-            self.start_button.config(state=DISABLED)
-
+        # Get ip address and update GUI with connection status
+        self.get_mac_ip()
 
     def InitFrames(self):
         self.instructions = Label(self, text="Please enter the IP address displayed below and click start before running PSI Calibration").pack()
@@ -42,7 +37,7 @@ class MainW(Tk):
         self.start_button = Button(self.button_frame, text="Start")
         self.start_button.config(command=self.run_script, anchor=W)
         self.reconnect_button = Button(self.button_frame, text="Reconnect")
-        self.reconnect_button.config(command=lambda: self.get_mac_ip(True), anchor=E)
+        self.reconnect_button.config(command=lambda: self.get_mac_ip(), anchor=E)
         self.feedback = Label(self, textvariable=self.message)
 
     def PlaceFrames(self):
@@ -124,7 +119,7 @@ class MainW(Tk):
         print("Successfully sent data in", time.time() - start_time, "seconds")
 
     # Get mac's ethernet ip address
-    def get_mac_ip(self, loaded=False):
+    def get_mac_ip(self):
         # Run command to list connected hardware ports
         self.output = check_output(['networksetup', '-listallhardwareports'])
         self.output = self.output[1:-1]
@@ -139,31 +134,31 @@ class MainW(Tk):
                 self.device = port[1].split(' ')[1]
                 break
 
+        # Successful Connection
         try:
             # Get the ip address associated with the ethernet port number
             self.mac_eth_ip = check_output(['ipconfig', 'getifaddr', self.device])[:-1]
-            self.message.set("Click to start server")
             print("Ethernet cable connected to Pi")
 
-            # Display the ip and update GUI
-            if loaded:
-                self.display_mac_eth_ip.set(self.mac_eth_ip)
-                self.start_button.config(state=NORMAL)
-                self.update()
+            # Update message and button, and display the ip
+            self.message.set("Click to start server")
+            self.start_button.config(state=NORMAL)
+            self.display_mac_eth_ip.set(self.mac_eth_ip)
+            self.update()
 
             return self.mac_eth_ip
 
+        # Unsuccessful Connection
         except Exception:
             print("Ethernet cable not connected to Pi")
             self.mac_eth_ip = "N/A"
 
-            # Display N/A and update GUI
-            if loaded:
-                self.start_button.config(state=DISABLED)
-                self.reconnect_button.config(state=NORMAL)
-                self.display_mac_eth_ip.set(self.mac_eth_ip)
-                self.message.set("Ethernet cable not connected to Pi")
-                self.update()
+            # Update message and buttons, and display N/A ip
+            self.message.set("Ethernet cable not connected to Pi")
+            self.start_button.config(state=DISABLED)
+            self.reconnect_button.config(state=NORMAL)
+            self.display_mac_eth_ip.set(self.mac_eth_ip)
+            self.update()
 
             return self.mac_eth_ip
 
