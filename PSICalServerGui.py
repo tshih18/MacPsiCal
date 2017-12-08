@@ -67,6 +67,7 @@ def send_to_pi(TCP_IP, TCP_PORT, offset_list):
     # creating socket connection to send data
     print("Sending data back to PI...")
     clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    print "Connecting to", TCP_IP, "at port", TCP_PORT
     clientSocket.connect((TCP_IP, TCP_PORT))
     start_time = time.time()
     clientSocket.send(offset_list)

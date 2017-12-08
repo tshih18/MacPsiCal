@@ -1,12 +1,9 @@
 import socket
-import cv2
 import base64
 import time
 from tqdm import tqdm
 from subprocess import check_output
 import argparse
-import re
-import ast
 import netifaces as ni
 
 in_development = False
