@@ -5,6 +5,7 @@ from subprocess import *
 import os
 import time
 import sys
+import pexpect
 
 class MainW(Tk):
     def __init__(self,parent):
@@ -29,23 +30,39 @@ class MainW(Tk):
         # Get ip address and update GUI with connection status
         self.get_mac_ip()
 
+        # enable internet sharing on ethernet thunderbolt
+        #'networksetup -setnetworkserviceenabled Thunderbolt\ Ethernet on'
+
     def InitFrames(self):
-        self.instructions = Label(self, text="Please enter the IP address displayed below and click start before running PSI Calibration").pack()
+        self.instructions = Label(self, text="Please enter the IP address displayed below and click start before running PSI Calibration")
         self.mac_ip = Label(self, textvariable=self.display_mac_eth_ip)
-        self.button_frame = Frame(self, height=50, width=200)
-        self.button_frame.pack_propagate(0) # don't shrink
-        self.start_button = Button(self.button_frame, text="Start")
+
+        self.set_ip_frame = Frame(self, height=50, width=200)
+        self.set_mac_ip_label = Label(self.set_ip_frame, text="Set Static IP:")
+        self.enter_mac_ip = Entry(self.set_ip_frame, width=12, validate="focusin")
+        self.set_mac_ip_button = Button(self.set_ip_frame, text="Set", command=self.set_mac_ip)
+
+        #self.button_frame = Frame(self, height=50, width=200)
+        #self.button_frame.pack_propagate(0) # don't shrink
+        self.start_button = Button(self, text="Start")
         self.start_button.config(command=self.run_script, anchor=W)
-        self.reconnect_button = Button(self.button_frame, text="Reconnect")
+        self.reconnect_button = Button(self, text="Reconnect")
         self.reconnect_button.config(command=lambda: self.get_mac_ip(), anchor=E)
         self.feedback = Label(self, textvariable=self.message)
 
     def PlaceFrames(self):
-        self.mac_ip.pack()
-        self.button_frame.pack()
-        self.start_button.pack()
-        self.reconnect_button.pack()
-        self.feedback.pack()
+        self.instructions.grid(row=0, column=0)
+        self.mac_ip.grid(row=1, column=0)
+
+        self.set_ip_frame.grid(row=2, column=0)
+        self.set_mac_ip_label.grid(row=2, column=0)
+        self.enter_mac_ip.grid(row=2, column=1)
+        self.set_mac_ip_button.grid(row=2, column=2)
+
+        #self.button_frame.grid(row=3, column=0)
+        self.start_button.grid(row=3, column=0)
+        self.reconnect_button.grid(row=4, column=0)
+        self.feedback.grid(row=5, column=0)
 
     # Becomes server and gets the parameters and ip from pi
     def read_from_pi(self, TCP_PORT, BUFFER_SIZE):
@@ -125,14 +142,17 @@ class MainW(Tk):
         self.output = self.output[1:-1]
         self.output = self.output.split('\n\n')
         self.device = ""
+        self.interfaceName = ""
         self.mac_eth_ip = ""
 
         # Grab the ethernet port number
         for port in self.output:
             port = port.split('\n')
             if "Ethernet" in port[0]:
+                self.interfaceName = port[0].split(': ')[1]
                 self.device = port[1].split(' ')[1]
                 break
+
 
         # Successful Connection
         try:
@@ -161,6 +181,24 @@ class MainW(Tk):
             self.update()
 
             return self.mac_eth_ip
+
+
+    def set_mac_ip(self):
+        self.interfaceName = self.interfaceName.replace(' ', '\ ')
+        cmd = 'networksetup -setmanual ' + self.interfaceName + ' ' + self.enter_mac_ip.get() + ' 255.255.255.0 8.8.8.8'
+        child = pexpect.spawn(cmd)
+        child.expect(pexpect.EOF)
+        print "Set ip address to", self.enter_mac_ip.get()
+        self.interfaceName = self.interfaceName.replace('\ ', '')
+
+        # Display new ip address
+        start_time = time.time()
+        while self.get_mac_ip() == "N/A":
+            if time.time() - start_time > 3:
+                self.message.set("Unable to set Ip, make sure Ethernet cable is connected")
+                self.update()
+                break
+            self.get_mac_ip()
 
     # Runs the entire script when start is clicked
     def run_script(self):
