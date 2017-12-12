@@ -34,11 +34,9 @@ class MainW(Tk):
         self.enter_win_ip = Entry(self.set_ip_frame, width=12, validate="focusin")
         self.set_win_ip_button = Button(self.set_ip_frame, text="Set", command=self.set_win_ip)
 
-        self.button_frame = Frame(self, height=50, width=200)
-        self.button_frame.pack_propagate(0) # don't shrink
-        self.start_button = Button(self.button_frame, text="Start")
+        self.start_button = Button(self, text="Start")
         self.start_button.config(command=self.run_script, anchor=W)
-        self.reconnect_button = Button(self.button_frame, text="Reconnect")
+        self.reconnect_button = Button(self, text="Reconnect")
         self.reconnect_button.config(command=lambda: self.get_win_ip(), anchor=E)
         self.feedback = Label(self, textvariable=self.message)
 
@@ -51,7 +49,6 @@ class MainW(Tk):
         self.enter_win_ip.grid(row=2, column=1)
         self.set_win_ip_button.grid(row=2, column=3)
 
-        self.button_frame.grid(row=3, column=0)
         self.start_button.grid(row=3, column=0)
         self.reconnect_button.grid(row=4, column=0)
         self.feedback.grid(row=5, column=0)

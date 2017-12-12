@@ -42,8 +42,6 @@ class MainW(Tk):
         self.enter_mac_ip = Entry(self.set_ip_frame, width=12, validate="focusin")
         self.set_mac_ip_button = Button(self.set_ip_frame, text="Set", command=self.set_mac_ip)
 
-        #self.button_frame = Frame(self, height=50, width=200)
-        #self.button_frame.pack_propagate(0) # don't shrink
         self.start_button = Button(self, text="Start")
         self.start_button.config(command=self.run_script, anchor=W)
         self.reconnect_button = Button(self, text="Reconnect")
@@ -59,7 +57,6 @@ class MainW(Tk):
         self.enter_mac_ip.grid(row=2, column=1)
         self.set_mac_ip_button.grid(row=2, column=2)
 
-        #self.button_frame.grid(row=3, column=0)
         self.start_button.grid(row=3, column=0)
         self.reconnect_button.grid(row=4, column=0)
         self.feedback.grid(row=5, column=0)
@@ -67,16 +64,16 @@ class MainW(Tk):
     # Becomes server and gets the parameters and ip from pi
     def read_from_pi(self, TCP_PORT, BUFFER_SIZE):
         print("Starting socket connection")
-        # create an INET, STREAMing socket
+        # Create an INET, STREAMing socket
         serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # bind the socket to host and a port.
+        # Bind the socket to host and a port.
         # '' means socket is reachable by any address the machine happens to have
         serverSocket.bind(('', TCP_PORT))
         print("Socket hostname:", socket.gethostname())
-        # become a server socket
+        # Become a server socket
         serverSocket.listen(1)
         print("Waiting for a connection...")
-        # accept connections from outside
+        # Accept connections from outside
         (clientsocket, addr) = serverSocket.accept()
         print('Connection address:', addr)
         data = ""
@@ -103,7 +100,7 @@ class MainW(Tk):
         decoded_data = base64.b64decode(image)
         #print "Decoded data:", decoded_data
 
-        # create writable image and write the decoding result
+        # Create writable image and write the decoding result
         image_result = open('image_decode.png', 'wb')
         image_result.write(decoded_data)
 
@@ -120,12 +117,12 @@ class MainW(Tk):
 
     # Becomes client and sends the values back to the pi
     def send_to_pi(self, TCP_IP, TCP_PORT, offset_list):
-        # format data to send to pi
+        # Format data to send to pi
         offset_list = offset_list[1:-2]
         offset_list += "END"
         print("Data to send:", offset_list)
 
-        # creating socket connection to send data
+        # Creating socket connection to send data
         print("Sending data back to PI...")
         clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         print "Connecting to", TCP_IP, "at port", TCP_PORT
@@ -148,7 +145,7 @@ class MainW(Tk):
         # Grab the ethernet port number
         for port in self.output:
             port = port.split('\n')
-            if "Ethernet" in port[0]:
+            if "Thunderbolt" in port[0]:
                 self.interfaceName = port[0].split(': ')[1]
                 self.device = port[1].split(' ')[1]
                 break
@@ -183,6 +180,7 @@ class MainW(Tk):
             return self.mac_eth_ip
 
 
+    # Manually set the ip address
     def set_mac_ip(self):
         self.interfaceName = self.interfaceName.replace(' ', '\ ')
         cmd = 'networksetup -setmanual ' + self.interfaceName + ' ' + self.enter_mac_ip.get() + ' 255.255.255.0 8.8.8.8'
