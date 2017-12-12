@@ -1,5 +1,3 @@
-# MacPsiCal
-
 ## Mac Setup Instructions
 ### 1. Enable Internet Sharing
   - System Preferences -> Sharing -> [Check] Internet Sharing -> [Check] the allowed ports
@@ -20,3 +18,7 @@
   static routers=169.254.140.1
   static domain_name_servers=8.8.8.8 8.8.4.4
   - ctl+x -> y -> enter
+
+## Windows Setup Instructions
+### 1. Disable Firewall
+  - WindowsPsiCalServerGuiClass.py should ask to turn off Firewall when starting server
