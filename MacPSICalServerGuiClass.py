@@ -34,7 +34,7 @@ class MainW(Tk):
         #'networksetup -setnetworkserviceenabled Thunderbolt\ Ethernet on'
 
     def InitFrames(self):
-        self.instructions = Label(self, text="Please enter the IP address displayed below and click start before running PSI Calibration.\nWhen reconnecting, please wait a couple seconds for the computer to recognize the port.")
+        self.instructions = Label(self, text="When setting up for the first time, go to settings and enter the IP address displayed below.\nStart the server before running PSI Calibration")
         self.mac_ip = Label(self, textvariable=self.display_mac_eth_ip)
 
         self.set_ip_frame = Frame(self, height=50, width=200)

@@ -23,7 +23,7 @@ class Header_Frame(Frame):
         self.Title.grid(row=0, column=0, sticky=W)
 
 class Center_Frame(Frame):
-    
+
     def __init__(self, parent,CalFields=None, IpField=None):
         #Frame.__init__(self,parent,bg="BLUE")
         Frame.__init__(self, parent)
@@ -47,7 +47,7 @@ class Center_Frame(Frame):
         self.Zero = Button(self, text='0',height = 4, width = 5, command=lambda: self.numClick('0'))
         self.Decimal = Button(self, text='.',height = 4, width = 5, command=lambda: self.numClick('.'))
         self.Backspace = Button(self, text='del',height = 4, width = 5,command=lambda: self.numClick('d'))
-        
+
         #Space the Buttons
         xspace=0
         # Starting Row and Column
@@ -60,7 +60,7 @@ class Center_Frame(Frame):
         self.Space1.grid(row=0,column=0,columnspan=1,padx=40,sticky=W)
         self.Space1.grid(row=1,column=0,columnspan=1,padx=40,sticky=W)
         self.Space1.grid(row=2,column=0,columnspan=1,padx=40,sticky=W)
-        
+
         #Place the Buttons
         self.One.grid(row=i, column=j, padx=xspace)
         self.Two.grid(row=i, column=j+1, padx=xspace)
@@ -74,16 +74,16 @@ class Center_Frame(Frame):
         self.Zero.grid(row=i+3,column=j, padx=xspace)
         self.Decimal.grid(row=i+3,column=j+1, padx=xspace)
         self.Backspace.grid(row=i+3,column=j+2, padx=xspace)
-    
+
     def numClick(self,c):
-        
+
         if self.CalFields is not None:
             if self.parent.focus_get() == self.CalFields[0]:
                 if c == 'd':
                     self.CalFields[0].delete(len(self.CalFields[0].get())-1,END)
                 else:
                     self.CalFields[0].insert(END,c)
-        
+
             elif self.parent.focus_get() == self.CalFields[1]:
                 if c == 'd':
                     self.CalFields[1].delete(len(self.CalFields[1].get())-1,END)
@@ -159,7 +159,7 @@ class Left_Frame(Frame):
         self.ProcessBox = Checkbutton(self, variable=self.ToggleProcess)
 
         self.Process_Settings = Button(self, text="Settings", command=self.Process_Computer_Settings)
-    
+
 
     def PlaceWidgets(self):
         #Label/Menu forChoosing Barrel
@@ -187,9 +187,9 @@ class Left_Frame(Frame):
         #Place Option Boxes
         self.CleanBox.grid(row=7, column=1, sticky=W)
         self.ProcessBox.grid(row=8, column=1, sticky=W)
-    
+
         self.Process_Settings.grid(row=8, column=1, padx=25, sticky=E)
-    
+
     def getFloat(self,data, index):
         bytess = data[index*4:(index+1)*4]
         return struct.unpack('f',"".join(map(chr,bytess)))[0]
@@ -217,7 +217,7 @@ class Left_Frame(Frame):
         self.RefWidth_field.insert(0,'17.9')
 
         return
-    
+
     def Process_Computer_Settings(self):
         # Initialize frames
         self.comp_process_settings = Toplevel(self)
@@ -231,8 +231,8 @@ class Left_Frame(Frame):
         self.IpField = Entry(self.IpFrame, width= 15, validate="focusin")
         self.SetIp = Button(self.IpFrame, text="Configure/Reboot", command=self.configure_ip)
         self.NumPad = Center_Frame(self.comp_process_settings, IpField=self.IpField)
-        
-        
+
+
         # Place frames
         self.back_button.grid(row=0, column=0, sticky=W, padx=15, pady=15)
         self.title.grid(row=0, column=0, sticky=E, padx=280)
@@ -242,7 +242,7 @@ class Left_Frame(Frame):
         self.IpField.grid(row=2, column=1)
         self.SetIp.grid(row=2, column=2)
         self.NumPad.grid(row=3, column=0, sticky=W+E+N+S, padx=210)
-    
+
         # Check comp_ip.txt for ip and put that ip in entry field
         if os.path.isfile("comp_ip.txt"):
             with open("comp_ip.txt", "r") as comp_ip_file:
@@ -254,7 +254,7 @@ class Left_Frame(Frame):
     # Saves the computer's ip address and sets a compatible static ip for the pi
     def configure_ip(self):
         comp_ip = self.IpField.get()
-        
+
         # Save computer's ip to a text file
         with open("comp_ip.txt", "w") as comp_ip_file:
             comp_ip_file.write(comp_ip)
@@ -264,7 +264,7 @@ class Left_Frame(Frame):
         hasInterface = False
         lines = []
         with open("/etc/dhcpcd.conf", "r") as f:
-            
+
             for line in f:
                 if re.match(r"\binterface eth0\b", line):
                     hasInterface = True
@@ -275,7 +275,7 @@ class Left_Frame(Frame):
         begin_comp_ip = ".".join(begin_comp_ip)
         new_ip = begin_comp_ip + ".115"
         new_route = begin_comp_ip + ".1"
-        
+
         # Find regex that matches the lines and delete them
         # Then append them to end of file
         '''
@@ -321,7 +321,7 @@ class Left_Frame(Frame):
                         line = "static domain_name_servers=8.8.8.8 8.8.4.4\n"
                     f.write(line)
                 f.close()
-        
+
         # Reboot pi
         #child = pexpect.spawn("sudo reboot")
         #child.expect(pexpect.EOF)
@@ -671,7 +671,7 @@ class Right_Frame(Frame):
                     if self.parent.Left.ToggleProcess.get() == 0:
                         offset_list = check_output(['/home/pi/Desktop/Code/SPI_mar30/saveme1','--image' ,'/home/pi/Desktop/Code/SPI_mar30/FilesToSend/image_PSI1.png' ,'--width' ,str(self.RefWidth) ,'--desiredwidth' ,str(self.width),'--spsi',str(NewPressure),'--ppmm', str(PixelToMM),'--margin',str(self.error)])
                     else:
-                        offset_list = check_output(['python2' ,'eth_client.py','--image' ,'/home/pi/Desktop/Code/SPI_mar30/FilesToSend/image_PSI1.png' ,'--width' ,str(self.RefWidth) ,'--desiredwidth' ,str(self.width),'--spsi',str(self.pressure),'--ppmm', '0','--margin',str(self.error),'--ip',self.ip])
+                        offset_list = check_output(['python2' ,'eth_client.py','--image' ,'/home/pi/Desktop/Code/SPI_mar30/FilesToSend/image_PSI1.png' ,'--width' ,str(self.RefWidth) ,'--desiredwidth' ,str(self.width),'--spsi',str(self.pressure),'--ppmm', str(PixelToMM),'--margin',str(self.error),'--ip',self.ip])
 
                     #offset_list = check_output(['python2' ,'mul_proc_measure_psi_cal_pi.py','--image' ,'/home/pi/Desktop/Code/SPI_mar30/FilesToSend/image_PSI1.png' ,'--width' ,'17.9' ,'--desiredwidth' ,str(self.width),'--spsi',str(NewPressure),'--ppmm',str(PixelToMM)])
                     ##offset_list = check_output(['/home/pi/Desktop/Code/SPI_mar30/mul_proc_measure_psi_cal_pi','--image' ,'/home/pi/Desktop/Code/SPI_mar30/FilesToSend/image_PSI1.png' ,'--width' ,'17.9' ,'--desiredwidth' ,str(self.width),'--spsi',str(self.pressure)])

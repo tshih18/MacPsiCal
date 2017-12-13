@@ -1,12 +1,15 @@
 import socket
+import cv2
 import base64
 import time
 from tqdm import tqdm
 from subprocess import check_output
 import argparse
+import re
+import ast
 import netifaces as ni
 
-in_development = False
+in_development = True
 
 def send_to_computer(TCP_IP, TCP_PORT, pi_eth_ip, IMAGE_FILE, parameters):
     # Format and add endstop keyword
@@ -86,6 +89,46 @@ def get_pi_eth_ip():
     ip = str(ni.ifaddresses('eth0')[ni.AF_INET][0]['addr'])
     return ip
 
+def set_ip_ip(begin_comp_ip):
+    hasInterface = False
+    lines = []
+    with open("/etc/dhcpcd.conf", "r") as f:
+        
+        for line in f:
+            if re.match(r"\binterface eth0\b", line):
+                hasInterface = True
+            lines.append(line)
+        f.close()
+
+    new_ip = begin_comp_ip + ".111"
+    new_route = begin_comp_ip + ".1"
+
+
+    # if the file does not have 'interface eth0' append everything to end
+    if not hasInterface:
+        with open("/etc/dhcpcd.conf", "a") as f:
+            interface = "interface eth0"
+            ip = "\nstatic ip_address=" + new_ip + "/24\n"
+            route = "static routers=" + new_route + "\n"
+            server = "static domain_name_server=8.8.8.8 8.8.4.4\n"
+            f.write(interface + ip + route + server)
+            f.close()
+    # if file already has 'interface eth0' modify that line
+    else:
+        with open("/etc/dhcpcd.conf", "w") as f:
+            for line in lines:
+                if re.match(r"\bstatic ip_address", line):
+                    line = "static ip_address=" + new_ip + "/24\n"
+                elif re.match(r"\bstatic routers", line):
+                    line = "static routers=" + new_route + "\n"
+                elif re.match(r"\bstatic domain_name_servers", line):
+                    line = "static domain_name_servers=8.8.8.8 8.8.4.4\n"
+                f.write(line)
+            f.close()
+
+    # need to reboot pi
+    return new_ip
+
 if __name__ == '__main__':
     start_time = time.time()
 
@@ -102,6 +145,18 @@ if __name__ == '__main__':
 
     # Get/Set variables
     pi_eth_ip = get_pi_eth_ip()
+    
+    # Check if first 3 numbers if comp ip matches pi ip
+    begin_pi_ip = pi_eth_ip.split(".")[:-1]
+    begin_pi_ip = ".".join(begin_pi_ip)
+    begin_comp_ip = args["ip"].split(".")[:-1]
+    begin_comp_ip = ".".join(begin_comp_ip)
+    
+    # Change the pi's ip address if beginning ip's dont match
+    if begin_pi_ip != begin_comp_ip:
+        new_ip = set_ip_ip(begin_comp_ip)
+        print "Pi's ip changed to", new_ip
+    
     TCP_IP = args["ip"]
     TCP_PORT = 5050
     BUFFER_SIZE = 1024

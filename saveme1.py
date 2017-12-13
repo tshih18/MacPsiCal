@@ -17,7 +17,7 @@ import math
 # python2 saveme1.py --image images/image_PSI1.png --width 17.9 --desiredwidth .8 --spsi 8 --margin .05
 # python2 saveme1.py --image images/peanut_test.png --width 17.9 --desiredwidth 2.1 --spsi 15 --margin .05
 
-def make_measurements(orig, final_edged, start_x, end_x, start_y, end_y, num_divisions=13.0):
+def make_measurements(orig, final_edged, start_x, end_x, start_y, end_y, pixelsPerMetric, num_divisions=13.0):
 
 	measurements = []
 
@@ -166,284 +166,289 @@ def process_image((image1, sat, sharp, bright, contra)): # default is original i
 
 	return edge
 
+def main():
+	# construct the argument parse and parse the arguments
+	ap = argparse.ArgumentParser()
+	ap.add_argument("-i", "--image", required=True,
+		help="path to the input image")
+	ap.add_argument("-w", "--width", type=float, required=True,
+		help="width of the left-most object in the image (in mm)")
+	ap.add_argument("-dw", "--desiredwidth", type=float, required=True,
+		help="desired width of object (in mm)")
+	ap.add_argument("-spsi", "--spsi", type=float, required=True,
+		help="starting psi")
+	ap.add_argument("-p", "--ppmm", type=float, required=False, default=0,
+		help="pixelspermm")
+	ap.add_argument("-m","--margin",type=float,required=True,
+		help="margin of error")
+	args = vars(ap.parse_args())
 
-# construct the argument parse and parse the arguments
-ap = argparse.ArgumentParser()
-ap.add_argument("-i", "--image", required=True,
-	help="path to the input image")
-ap.add_argument("-w", "--width", type=float, required=True,
-	help="width of the left-most object in the image (in mm)")
-ap.add_argument("-dw", "--desiredwidth", type=float, required=True,
-	help="desired width of object (in mm)")
-ap.add_argument("-spsi", "--spsi", type=float, required=True,
-	help="starting psi")
-ap.add_argument("-p", "--ppmm", type=float, required=False, default=0,
-	help="pixelspermm")
-ap.add_argument("-m","--margin",type=float,required=True,
-	help="margin of error")
-args = vars(ap.parse_args())
+	#########################################################
 
-#########################################################
+	# Theo - I had to add this line to accept the truncated, decoded images
+	ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-ImageFile.LOAD_TRUNCATED_IMAGES = True
+	image = Image.open(args["image"]).convert('RGB')
+	width, height = image.size   # Get dimensions
+	## these image dimsension are based off points -- I can get these points from edge detection used in offsets
+	image = image.crop((0, int(height/5.0), width, height)) # (left, top, right, bottom) (0, height/4.0, width, height)
 
-image = Image.open(args["image"]).convert('RGB')
-width, height = image.size   # Get dimensions
-## these image dimsension are based off points -- I can get these points from edge detection used in offsets
-image = image.crop((0, int(height/5.0), width, height)) # (left, top, right, bottom) (0, height/4.0, width, height)
 
+	### mul processes start
+	data = ( [args["image"], 10, 6, .5, 1], [args["image"], 1, 1, 1, 1], [args["image"], 10, 1, 1, 1])
 
-### mul processes start
-data = ( [args["image"], 10, 6, .5, 1], [args["image"], 1, 1, 1, 1], [args["image"], 10, 1, 1, 1])
+	p = multiprocessing.Pool(4) # assuming quad core
+	edge1, edge2, edge3 = p.map(process_image, data)
 
-p = multiprocessing.Pool(4) # assuming quad core
-edge1, edge2, edge3 = p.map(process_image, data)
+	# print("If last print then did wait")
 
-# print("If last print then did wait")
+	### mul processes end
 
-### mul processes end
+	# convert image to cv2 style
+	image = np.array(image) # opens image in RGB
+	image = image[:, :, ::-1].copy() # inverse to BGR for opencv format
 
-# convert image to cv2 style
-image = np.array(image) # opens image in RGB
-image = image[:, :, ::-1].copy() # inverse to BGR for opencv format
+	# rotate image here 180 degrees if need be
+	# grab the dimensions of the image and calculate the center
+	# of the image
+	(h, w) = image.shape[:2]
+	center = (w / 2, h / 2)
 
-# rotate image here 180 degrees if need be
-# grab the dimensions of the image and calculate the center
-# of the image
-(h, w) = image.shape[:2]
-center = (w / 2, h / 2)
+	# rotate the image by 180 degrees
+	M = cv2.getRotationMatrix2D(center, 180, 1.0)
+	image = cv2.warpAffine(image, M, (w, h))
 
-# rotate the image by 180 degrees
-M = cv2.getRotationMatrix2D(center, 180, 1.0)
-image = cv2.warpAffine(image, M, (w, h))
+	# #########################################################
 
-# #########################################################
+	final_edged = cv2.addWeighted(edge1,.5,edge2,.5,0)
 
-final_edged = cv2.addWeighted(edge1,.5,edge2,.5,0)
+	ret,final_edged = cv2.threshold(final_edged,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
-ret,final_edged = cv2.threshold(final_edged,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+	final_edged = cv2.addWeighted(final_edged,.5,edge3,.5,0)
 
-final_edged = cv2.addWeighted(final_edged,.5,edge3,.5,0)
+	ret,final_edged = cv2.threshold(final_edged,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
-ret,final_edged = cv2.threshold(final_edged,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
+	# find contours in the edge map
+	cnts = cv2.findContours(final_edged.copy(), cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+	cnts = cnts[0] if imutils.is_cv2() else cnts[1]
 
-# find contours in the edge map
-cnts = cv2.findContours(final_edged.copy(), cv2.RETR_EXTERNAL,
-	cv2.CHAIN_APPROX_SIMPLE)
-cnts = cnts[0] if imutils.is_cv2() else cnts[1]
+	# sort the contours from left-to-right and initialize the
+	# 'pixels per metric' calibration variable
+	(cnts, _) = contours.sort_contours(cnts)
+	pixelsPerMetric = None
 
-# sort the contours from left-to-right and initialize the
-# 'pixels per metric' calibration variable
-(cnts, _) = contours.sort_contours(cnts)
-pixelsPerMetric = None
+	if (args["ppmm"] != 0):
+		pixelsPerMetric = args["ppmm"]
 
-if (args["ppmm"] != 0):
-	pixelsPerMetric = args["ppmm"]
+	#victor -- attempt to get 2 largest areas
 
-#victor -- attempt to get 2 largest areas
+	reference_obj = None
+	filpos = 0
+	while reference_obj is None:
+		#if cv2.contourArea(cnts[filpos]) > 1000: #counters possible small leftmost objects not the square
+		if cv2.contourArea(cnts[filpos]) > 10000: #counters possible small leftmost objects not the square
 
-reference_obj = None
-filpos = 0
-while reference_obj is None:
-	#if cv2.contourArea(cnts[filpos]) > 1000: #counters possible small leftmost objects not the square
-	if cv2.contourArea(cnts[filpos]) > 10000: #counters possible small leftmost objects not the square
+			reference_obj = copy.deepcopy(cnts[filpos])
+			cnts = cnts[:filpos] + cnts[filpos+1:]
+			filament = False
+		else :
+			filpos += 1
 
-		reference_obj = copy.deepcopy(cnts[filpos])
-		cnts = cnts[:filpos] + cnts[filpos+1:]
-		filament = False
-	else :
-		filpos += 1
 
+	index = 0
+	indices = list()
+	contour_areas = list()
+	for c in cnts:
 
-index = 0
-indices = list()
-contour_areas = list()
-for c in cnts:
+		#if (cv2.contourArea(c) > 1000):
+		if (cv2.contourArea(c) > 10000):
+			indices.append(index)
+			contour_areas.append(cv2.contourArea(c))
 
-	#if (cv2.contourArea(c) > 1000):
-	if (cv2.contourArea(c) > 10000):
-		indices.append(index)
-		contour_areas.append(cv2.contourArea(c))
+		index += 1
 
-	index += 1
+	sorted_cnts_by_areas = [cnts[x] for y, x in zip(contour_areas, indices)]
+	sorted_cnts_by_areas.insert(0, reference_obj)
 
-sorted_cnts_by_areas = [cnts[x] for y, x in zip(contour_areas, indices)]
-sorted_cnts_by_areas.insert(0, reference_obj)
+	# sorted_cnts_by_areas = sorted_cnts_by_areas[:2]
 
-# sorted_cnts_by_areas = sorted_cnts_by_areas[:2]
+	if (pixelsPerMetric == None):
+		sorted_cnts_by_areas = [sorted_cnts_by_areas[0], sorted_cnts_by_areas[len(sorted_cnts_by_areas)-1]]
+	else:
+		sorted_cnts_by_areas = [sorted_cnts_by_areas[len(sorted_cnts_by_areas)-1]]
 
-if (pixelsPerMetric == None):
-	sorted_cnts_by_areas = [sorted_cnts_by_areas[0], sorted_cnts_by_areas[len(sorted_cnts_by_areas)-1]]
-else:
-	sorted_cnts_by_areas = [sorted_cnts_by_areas[len(sorted_cnts_by_areas)-1]]
+	desiredwidth = args["desiredwidth"]
 
-desiredwidth = args["desiredwidth"]
+	measured_height = 0
+	MIN_EXTRUSION_HEIGHT = 7
+	# print("num objs: " + str(len(sorted_cnts_by_areas)))
+	avg_measurements = 0
+	# loop over the contours individually
+	for c in sorted_cnts_by_areas:
+		# if the contour is not sufficiently large, ignore it
+	##	if cv2.contourArea(c) < 500:
+	##		continue
 
-measured_height = 0
-MIN_EXTRUSION_HEIGHT = 10
-# print("num objs: " + str(len(sorted_cnts_by_areas)))
-avg_measurements = 0
-# loop over the contours individually
-for c in sorted_cnts_by_areas:
-	# if the contour is not sufficiently large, ignore it
-##	if cv2.contourArea(c) < 500:
-##		continue
+		# print("contour area: " + str(cv2.contourArea(c)))
 
-	# print("contour area: " + str(cv2.contourArea(c)))
+		# compute the rotated bounding box of the contour
+		orig = image.copy() # if you want everything to stay just keep this outside the for loop
+		c = cv2.convexHull(c) #victor added
+		box = cv2.minAreaRect(c)
 
-	# compute the rotated bounding box of the contour
-	orig = image.copy() # if you want everything to stay just keep this outside the for loop
-	c = cv2.convexHull(c) #victor added
-	box = cv2.minAreaRect(c)
+		# The output of cv2.minAreaRect() is ((x, y), (w, h), angle). Using cv2.cv.BoxPoints() is meant to convert this to points.
+		# # (x, y) is center pixel position and w and h go in and outward accordingly encasing the contour
+		# #  --- pixel position is relative to both original image and final edged image
+		# # x increases going right and decreases going left
+		# # y increases going down and decreases going up
 
-	# The output of cv2.minAreaRect() is ((x, y), (w, h), angle). Using cv2.cv.BoxPoints() is meant to convert this to points.
-	# # (x, y) is center pixel position and w and h go in and outward accordingly encasing the contour
-	# #  --- pixel position is relative to both original image and final edged image
-	# # x increases going right and decreases going left
-	# # y increases going down and decreases going up
+
+	############# Experimental --- unsure if it actually works
+		(x, y), (w, h), angle = box
 
-
-############# Experimental --- unsure if it actually works
-	(x, y), (w, h), angle = box
+		# print("(x, y), (w, h), angle: " + str(x) + " " + str(y) + " " + str(w) + " " + str(h) + " " + str(angle))
 
-	# print("(x, y), (w, h), angle: " + str(x) + " " + str(y) + " " + str(w) + " " + str(h) + " " + str(angle))
+		# angle = 0 #converts angle to 0 rotation so its no longer the minimum bounding box
 
-	# angle = 0 #converts angle to 0 rotation so its no longer the minimum bounding box
+		if (90 - abs(angle) < abs(angle) - 0):
+			angle = 90
+		else :
+			angle = 0
 
-	if (90 - abs(angle) < abs(angle) - 0):
-		angle = 90
-	else :
-		angle = 0
+		box = ((x, y), (w, h), angle)
+	#############
 
-	box = ((x, y), (w, h), angle)
-#############
-
-	# print(box)
-
-	box = cv2.cv.BoxPoints(box) if imutils.is_cv2() else cv2.boxPoints(box)
-	box = np.array(box, dtype="int")
-
-	# order the points in the contour such that they appear
-	# in top-left, top-right, bottom-right, and bottom-left
-	# order, then draw the outline of the rotated bounding
-	# box
-	box = perspective.order_points(box)
-
-	### using box pts above create the start_x and start_y coordinates
-
-
-	# cv2.drawContours(orig, [box.astype("int")], -1, (0, 255, 0), 2)
-
-	# # loop over the original points and draw them
-	# for (x, y) in box:
-	# 	cv2.circle(orig, (int(x), int(y)), 5, (0, 0, 255), -1)
-
-	# unpack the ordered bounding box, then compute the midpoint
-	# between the top-left and top-right coordinates, followed by
-	# the midpoint between bottom-left and bottom-right coordinates
-	(tl, tr, br, bl) = box
-	(tltrX, tltrY) = midpoint(tl, tr)
-	(blbrX, blbrY) = midpoint(bl, br)
-
-	# compute the midpoint between the top-left and top-right points,
-	# followed by the midpoint between the top-righ and bottom-right
-	(tlblX, tlblY) = midpoint(tl, bl)
-	(trbrX, trbrY) = midpoint(tr, br)
-
-	# # draw the midpoints on the image
-	# cv2.circle(orig, (int(tltrX), int(tltrY)), 5, (255, 0, 0), -1)
-	# cv2.circle(orig, (int(blbrX), int(blbrY)), 5, (255, 0, 0), -1)
-
-	# # draw lines between the midpoints
-	# cv2.line(orig, (int(tltrX), int(tltrY)), (int(blbrX), int(blbrY)),
-	# 	(255, 0, 255), 2)
-
-	# compute the Euclidean distance between the midpoints
-	dA = dist.euclidean((tltrX, tltrY), (blbrX, blbrY))
-	dB = dist.euclidean((tlblX, tlblY), (trbrX, trbrY))
-
-	# print("dA " + str(dA))
-	# print("dB " + str(dB))
-
-	# if the pixels per metric has not been initialized, then
-	# compute it as the ratio of pixels to supplied metric
-	# (in this case, mm)
-	if pixelsPerMetric is None:
-		pixelsPerMetric = dB / args["width"]
-		# print(pixelsPerMetric)
-		continue # victor added to ignore reference object and go to last object
-
-	# compute the size of the object
-	dimA = dA / pixelsPerMetric
-	dimB = dB / pixelsPerMetric # width of object
-
-	measured_height = dimA
-	# print("dimA " + str(dimA))
-	# print("dimB " + str(dimB))
-
-
-	# y is rows and x is columns
-	# +-10 is to get black border --- this can cause error for overlapping or to close objects
-	center_x, center_y = midpoint((tlblX, tlblY),(trbrX, trbrY))
-	x_dist = dist.euclidean(tl, tr)
-	y_dist = dist.euclidean(tl, bl)
-	start_x = int(math.floor(center_x - (x_dist/2.0) - 10))
-	end_x = int(math.ceil(center_x + (x_dist/2.0) + 10))
-	start_y = int(math.floor(center_y - (y_dist/2.0) - 10))
-	end_y = int(math.ceil(center_y + (y_dist/2.0) + 10))
-
-	# print(str(start_x) + " " + str(end_x) + " " + str(start_y) + " " + str(end_y) + " added +- 10 to both ends to create black border")
-	contour_area = final_edged[start_y:end_y, start_x:end_x]
-	contour_area = np.array(contour_area)
-	# cv2.imshow("contour_area", contour_area)
-	# cv2.waitKey(0)
-
-	# try:
-	avg_measurements = make_measurements(orig, final_edged, start_x, end_x, start_y, end_y)
-	# except Exception as e:
-	# 	avg_measurements = 0
-	# 	break;
-
-	# print("avg_measurements: " + str(avg_measurements) + " mm")
-
-	# draw the object sizes on the image
-	# cv2.putText(orig, "height: {:.3f}mm".format(dimA),
-	# 	(int(tltrX - 40), int(tltrY - 10)), cv2.FONT_HERSHEY_SIMPLEX,
-	# 	0.65, (0, 0, 0), 2)
-
-	# show the output image
-
-	# cv2.imshow("Object Measurement via Enhanced Image", orig)
-	# cv2.waitKey(0)
-marginoferror = args["margin"]
-spsi = args["spsi"]
-# newpsi = (desiredwidth * spsi) / dimB
-if avg_measurements != 0:
+		# print(box)
+
+		box = cv2.cv.BoxPoints(box) if imutils.is_cv2() else cv2.boxPoints(box)
+		box = np.array(box, dtype="int")
+
+		# order the points in the contour such that they appear
+		# in top-left, top-right, bottom-right, and bottom-left
+		# order, then draw the outline of the rotated bounding
+		# box
+		box = perspective.order_points(box)
+
+		### using box pts above create the start_x and start_y coordinates
+
+
+		# cv2.drawContours(orig, [box.astype("int")], -1, (0, 255, 0), 2)
+
+		# # loop over the original points and draw them
+		# for (x, y) in box:
+		# 	cv2.circle(orig, (int(x), int(y)), 5, (0, 0, 255), -1)
+
+		# unpack the ordered bounding box, then compute the midpoint
+		# between the top-left and top-right coordinates, followed by
+		# the midpoint between bottom-left and bottom-right coordinates
+		(tl, tr, br, bl) = box
+		(tltrX, tltrY) = midpoint(tl, tr)
+		(blbrX, blbrY) = midpoint(bl, br)
+
+		# compute the midpoint between the top-left and top-right points,
+		# followed by the midpoint between the top-righ and bottom-right
+		(tlblX, tlblY) = midpoint(tl, bl)
+		(trbrX, trbrY) = midpoint(tr, br)
+
+		# # draw the midpoints on the image
+		# cv2.circle(orig, (int(tltrX), int(tltrY)), 5, (255, 0, 0), -1)
+		# cv2.circle(orig, (int(blbrX), int(blbrY)), 5, (255, 0, 0), -1)
+
+		# # draw lines between the midpoints
+		# cv2.line(orig, (int(tltrX), int(tltrY)), (int(blbrX), int(blbrY)),
+		# 	(255, 0, 255), 2)
+
+		# compute the Euclidean distance between the midpoints
+		dA = dist.euclidean((tltrX, tltrY), (blbrX, blbrY))
+		dB = dist.euclidean((tlblX, tlblY), (trbrX, trbrY))
+
+		# print("dA " + str(dA))
+		# print("dB " + str(dB))
+
+		# if the pixels per metric has not been initialized, then
+		# compute it as the ratio of pixels to supplied metric
+		# (in this case, mm)
+		if pixelsPerMetric is None:
+			pixelsPerMetric = dB / args["width"]
+			# print(pixelsPerMetric)
+			continue # victor added to ignore reference object and go to last object
+
+		# compute the size of the object
+		dimA = dA / pixelsPerMetric
+		dimB = dB / pixelsPerMetric # width of object
+
+		measured_height = dimA
+		# print("dimA " + str(dimA))
+		# print("dimB " + str(dimB))
+
+
+		# y is rows and x is columns
+		# +-10 is to get black border --- this can cause error for overlapping or to close objects
+		center_x, center_y = midpoint((tlblX, tlblY),(trbrX, trbrY))
+		x_dist = dist.euclidean(tl, tr)
+		y_dist = dist.euclidean(tl, bl)
+		start_x = int(math.floor(center_x - (x_dist/2.0) - 10))
+		end_x = int(math.ceil(center_x + (x_dist/2.0) + 10))
+		start_y = int(math.floor(center_y - (y_dist/2.0) - 10))
+		end_y = int(math.ceil(center_y + (y_dist/2.0) + 10))
+
+		# print(str(start_x) + " " + str(end_x) + " " + str(start_y) + " " + str(end_y) + " added +- 10 to both ends to create black border")
+		contour_area = final_edged[start_y:end_y, start_x:end_x]
+		contour_area = np.array(contour_area)
+		# cv2.imshow("contour_area", contour_area)
+		# cv2.waitKey(0)
+
+		# try:
+		avg_measurements = make_measurements(orig, final_edged, start_x, end_x, start_y, end_y, pixelsPerMetric)
+		# except Exception as e:
+		# 	avg_measurements = 0
+		# 	break;
+
+		# print("avg_measurements: " + str(avg_measurements) + " mm")
+
+		# draw the object sizes on the image
+		# cv2.putText(orig, "height: {:.3f}mm".format(dimA),
+		# 	(int(tltrX - 40), int(tltrY - 10)), cv2.FONT_HERSHEY_SIMPLEX,
+		# 	0.65, (0, 0, 0), 2)
+
+		# show the output image
+
+		# cv2.imshow("Object Measurement via Enhanced Image", orig)
+		# cv2.waitKey(0)
+	marginoferror = args["margin"]
+	spsi = args["spsi"]
+	# newpsi = (desiredwidth * spsi) / dimB
+	if avg_measurements != 0:
 		newpsi = (desiredwidth * spsi) / avg_measurements
 
-is_greater = False # newpsi is greater than spsi?
-if avg_measurements != 0:
+	is_greater = False # newpsi is greater than spsi?
+	if avg_measurements != 0:
 		if (newpsi > spsi):
-				is_greater = True
+			is_greater = True
 
 		if (abs(newpsi - spsi) > (.17 * spsi) and is_greater): # its not within 1/2 sd of the spsi as mean
-				newpsi = spsi + (.17 * spsi) # if newpsi was raised larger than 1sd away cap it
-		elif (abs(newpsi - spsi) > (.17 * spsi) and  not is_greater):
-				newpsi = spsi - (.17 * spsi) # if newpsi was lowered more than 1sd away cap it
+			newpsi = spsi + (.17 * spsi) # if newpsi was raised larger than 1sd away cap it
+		elif (abs(newpsi - spsi) > (.17 * spsi) and not is_greater):
+			newpsi = spsi - (.17 * spsi) # if newpsi was lowered more than 1sd away cap it
 
-# print(desiredwidth)
-# print(dimB)
-# info = "[" + str(isWithin(desiredwidth, dimB)) + "," + str(newpsi) + "]"
+	# print(desiredwidth)
+	# print(dimB)
+	# info = "[" + str(isWithin(desiredwidth, dimB)) + "," + str(newpsi) + "]"
 
-# when height of last printed extrusion is small
-if measured_height < MIN_EXTRUSION_HEIGHT or avg_measurements == 0:
-		#print("measured_height: " + str(measured_height) + " MIN_EXTRUSION_HEIGHT: " + str(MIN_EXTRUSION_HEIGHT))
-		#print("avg_measurements: " + str(avg_measurements))
+	# when height of last printed extrusion is small
+	if measured_height < MIN_EXTRUSION_HEIGHT or avg_measurements == 0:
+		print("measured_height: " + str(measured_height) + " MIN_EXTRUSION_HEIGHT: " + str(MIN_EXTRUSION_HEIGHT))
+		print("avg_measurements: " + str(avg_measurements))
 		info = "[True, 0, 0, 0]"
-else:
-	info = "[" + str(isWithin(desiredwidth, avg_measurements, (float(args["margin"])/100))) + "," + str(newpsi) + "," + str(pixelsPerMetric) + "," + str(avg_measurements) +"]"
-# info = "[" + str(isWithin(desiredwidth, avg_measurements)) + "," + str(newpsi) + "," + str(pixelsPerMetric) +"]"
-info = ast.literal_eval(info)
-# print(str(info[0]) + " " + str(info[1]))
-print(info)
+	else:
+		info = "[" + str(isWithin(desiredwidth, avg_measurements)) + "," + str(newpsi) + "," + str(pixelsPerMetric) + "," + str(avg_measurements) +"]"
+		#orig: info = "[" + str(isWithin(desiredwidth, avg_measurements, (float(args["margin"])/100)) + "," + str(newpsi) + "," + str(pixelsPerMetric) + "," + str(avg_measurements) +"]"
+		# info = "[" + str(isWithin(desiredwidth, avg_measurements)) + "," + str(newpsi) + "," + str(pixelsPerMetric) +"]"
+	info = ast.literal_eval(info)
+	# print(str(info[0]) + " " + str(info[1]))
+	print(info)
+	#return info
+
+if __name__ == '__main__':
+	main()
