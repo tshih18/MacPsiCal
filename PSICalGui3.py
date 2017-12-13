@@ -671,7 +671,7 @@ class Right_Frame(Frame):
                     if self.parent.Left.ToggleProcess.get() == 0:
                         offset_list = check_output(['/home/pi/Desktop/Code/SPI_mar30/saveme1','--image' ,'/home/pi/Desktop/Code/SPI_mar30/FilesToSend/image_PSI1.png' ,'--width' ,str(self.RefWidth) ,'--desiredwidth' ,str(self.width),'--spsi',str(NewPressure),'--ppmm', str(PixelToMM),'--margin',str(self.error)])
                     else:
-                        offset_list = check_output(['python2' ,'eth_client.py','--image' ,'/home/pi/Desktop/Code/SPI_mar30/FilesToSend/image_PSI1.png' ,'--width' ,str(self.RefWidth) ,'--desiredwidth' ,str(self.width),'--spsi',str(self.pressure),'--ppmm', str(PixelToMM),'--margin',str(self.error),'--ip',self.ip])
+                        offset_list = check_output(['python2' ,'eth_client.py','--image' ,'/home/pi/Desktop/Code/SPI_mar30/FilesToSend/image_PSI1.png' ,'--width' ,str(self.RefWidth) ,'--desiredwidth' ,str(self.width),'--spsi',str(NewPressure),'--ppmm', str(PixelToMM),'--margin',str(self.error),'--ip',self.ip])
 
                     #offset_list = check_output(['python2' ,'mul_proc_measure_psi_cal_pi.py','--image' ,'/home/pi/Desktop/Code/SPI_mar30/FilesToSend/image_PSI1.png' ,'--width' ,'17.9' ,'--desiredwidth' ,str(self.width),'--spsi',str(NewPressure),'--ppmm',str(PixelToMM)])
                     ##offset_list = check_output(['/home/pi/Desktop/Code/SPI_mar30/mul_proc_measure_psi_cal_pi','--image' ,'/home/pi/Desktop/Code/SPI_mar30/FilesToSend/image_PSI1.png' ,'--width' ,'17.9' ,'--desiredwidth' ,str(self.width),'--spsi',str(self.pressure)])
