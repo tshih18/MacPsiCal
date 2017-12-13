@@ -5,6 +5,7 @@ from subprocess import *
 import os
 import time
 import sys
+import pexpect
 
 class MainW(Tk):
     def __init__(self,parent):
@@ -31,12 +32,14 @@ class MainW(Tk):
 
         self.set_ip_frame = Frame(self, height=50, width=200)
         self.set_win_ip_label = Label(self.set_ip_frame, text="Set Static IP:")
-        self.enter_win_ip = Entry(self.set_ip_frame, width=12, validate="focusin")
+        self.enter_win_ip = Entry(self.set_ip_frame, width=14, validate="focusin")
         self.set_win_ip_button = Button(self.set_ip_frame, text="Set", command=self.set_win_ip)
 
-        self.start_button = Button(self, text="Start")
+        self.button_frame = Frame(self, height=50, width=200)
+        self.button_frame.pack_propagate(0) # don't shrink
+        self.start_button = Button(self.button_frame, text="Start")
         self.start_button.config(command=self.run_script, anchor=W)
-        self.reconnect_button = Button(self, text="Reconnect")
+        self.reconnect_button = Button(self.button_frame, text="Reconnect")
         self.reconnect_button.config(command=lambda: self.get_win_ip(), anchor=E)
         self.feedback = Label(self, textvariable=self.message)
 
@@ -49,6 +52,7 @@ class MainW(Tk):
         self.enter_win_ip.grid(row=2, column=1)
         self.set_win_ip_button.grid(row=2, column=3)
 
+        self.button_frame.grid(row=3, column=0)
         self.start_button.grid(row=3, column=0)
         self.reconnect_button.grid(row=4, column=0)
         self.feedback.grid(row=5, column=0)
@@ -124,23 +128,39 @@ class MainW(Tk):
         clientSocket.close()
         print("Successfully sent data in", time.time() - start_time, "seconds")
 
+
     def set_win_ip(self):
-        return
+        check_output('netsh interface ip set address '+ self.interfaceName + ' static ' + self.enter_win_ip.get() + ' 255.255.255.0 8.8.8.8')
+        # Display new ip address
+        start_time = time.time()
+        self.set_win_ip_button.config(state=DISABLED)
+        while self.get_win_ip() == "N/A":
+            if time.time() - start_time > 5:
+                self.message.set("Unable to set Ip, make sure Ethernet cable is connected")
+                self.update()
+                break
+            self.get_win_ip()
+        self.set_win_ip_button.config(state=NORMAL)
 
     # Get windows's ethernet ip address
     def get_win_ip(self):
+        # Run command to list all network connections
         output = check_output(['ipconfig'])
         output = output.split('\r\n')
         self.win_eth_ip = ""
 
+        # Look at the output and grab the ethernet connection name and address
         for (i,x) in enumerate(output):
             if 'Ethernet' in x:
+                self.interfaceName = '"' + x.split("adapter ")[1][:-1] + '"'
                 # i+2 to skip the '' and go to next index
                 for (j,y) in enumerate(output[i+2:]):
                     if y == "": break
                     if "IPv4" in y:
                         y = y.split(": ")
                         self.win_eth_ip = y[1]
+                        break
+                break
 
         # Successful Connection
         if self.win_eth_ip != "":
@@ -155,10 +175,13 @@ class MainW(Tk):
         else:
             print("Ethernet cable not connected to Pi")
             self.win_eth_ip = "N/A"
+
+            # Update messages and buttons, and display N/A ip
             self.message.set("Ethernet cable not connected to Pi")
             self.start_button.config(state=DISABLED)
             self.reconnect_button.config(state=NORMAL)
             self.display_win_eth_ip.set(self.win_eth_ip)
+            self.update()
 
         return self.win_eth_ip
 
@@ -172,8 +195,82 @@ class MainW(Tk):
             self.offset_list = self.psi_cal(self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin)
             self.send_to_pi(self.pi_eth_ip, self.TCP_PORT, self.offset_list)
 
+def isUserAdmin():
+    if os.name == 'nt':
+        import ctypes
+        # WARNING: requires Windows XP SP2 or higher!
+        try:
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        except:
+            traceback.print_exc()
+            print "Admin check failed, assuming not an admin."
+            return False
+    elif os.name == 'posix':
+        # Check for root on Posix
+        return os.getuid() == 0
+    else:
+        raise RuntimeError, "Unsupported operating system for this module: %s" % (os.name,)
 
+def runAsAdmin(cmdLine=None, wait=True):
+    if os.name != 'nt':
+        raise RuntimeError, "This function is only implemented on Windows."
+
+    import win32api, win32con, win32event, win32process
+    from win32com.shell.shell import ShellExecuteEx
+    from win32com.shell import shellcon
+
+    python_exe = sys.executable
+
+    if cmdLine is None:
+        cmdLine = [python_exe] + sys.argv
+    elif type(cmdLine) not in (types.TupleType,types.ListType):
+        raise ValueError, "cmdLine is not a sequence."
+    cmd = '"%s"' % (cmdLine[0],)
+    # XXX TODO: isn't there a function or something we can call to massage command line params?
+    params = " ".join(['"%s"' % (x,) for x in cmdLine[1:]])
+    cmdDir = ''
+    showCmd = win32con.SW_SHOWNORMAL
+    #showCmd = win32con.SW_HIDE
+    lpVerb = 'runas'  # causes UAC elevation prompt.
+
+    # print "Running", cmd, params
+
+    # ShellExecute() doesn't seem to allow us to fetch the PID or handle
+    # of the process, so we can't get anything useful from it. Therefore
+    # the more complex ShellExecuteEx() must be used.
+
+    procInfo = ShellExecuteEx(nShow=showCmd,
+                              fMask=shellcon.SEE_MASK_NOCLOSEPROCESS,
+                              lpVerb=lpVerb,
+                              lpFile=cmd,
+                              lpParameters=params)
+
+    if wait:
+        procHandle = procInfo['hProcess']
+        obj = win32event.WaitForSingleObject(procHandle, win32event.INFINITE)
+        rc = win32process.GetExitCodeProcess(procHandle)
+        #print "Process handle %s returned code %s" % (procHandle, rc)
+    else:
+        rc = None
+
+    return rc
+
+def test():
+    rc = 0
+    if not self.isUserAdmin():
+        print "You're not an admin.", os.getpid(), "params: ", sys.argv
+        #rc = runAsAdmin(["c:\\Windows\\notepad.exe"])
+        rc = self.runAsAdmin()
+    else:
+        print "You are an admin!", os.getpid(), "params: ", sys.argv
+        rc = 0
+    x = raw_input('Press Enter to exit.')
+    return rc
 
 if __name__ == "__main__":
-    app = MainW(None)
-    app.mainloop()
+    # If not running as admin, re-run script as admin
+    if not isUserAdmin():
+        runAsAdmin()
+    else:
+        app = MainW(None)
+        app.mainloop()

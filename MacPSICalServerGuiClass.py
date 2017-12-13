@@ -190,6 +190,7 @@ class MainW(Tk):
         self.interfaceName = self.interfaceName.replace('\ ', '')
 
         # Display new ip address
+        self.set_mac_ip_button.config(state=DISABLED)
         start_time = time.time()
         while self.get_mac_ip() == "N/A":
             if time.time() - start_time > 3:
@@ -197,6 +198,7 @@ class MainW(Tk):
                 self.update()
                 break
             self.get_mac_ip()
+        self.set_mac_ip_button.config(state=NORMAL)
 
     # Runs the entire script when start is clicked
     def run_script(self):
@@ -207,7 +209,6 @@ class MainW(Tk):
             (self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin, self.pi_eth_ip) = self.read_from_pi(self.TCP_PORT, self.BUFFER_SIZE)
             self.offset_list = self.psi_cal(self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin)
             self.send_to_pi(self.pi_eth_ip, self.TCP_PORT, self.offset_list)
-
 
 
 if __name__ == "__main__":
