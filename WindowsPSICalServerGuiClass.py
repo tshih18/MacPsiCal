@@ -27,11 +27,11 @@ class MainW(Tk):
         self.get_win_ip()
 
     def InitFrames(self):
-        self.instructions = Label(self, text="Please enter the IP address displayed below and click start before running PSI Calibration")
+        self.instructions = Label(self, text="Please enter the IP address displayed below and click start before running PSI Calibration.\nWhen reconnecting, please wait a couple seconds for the computer to recognize the port.")
         self.win_ip = Label(self, textvariable=self.display_win_eth_ip)
 
         self.set_ip_frame = Frame(self, height=50, width=200)
-        self.set_win_ip_label = Label(self.set_ip_frame, text="Set Static IP:")
+        self.set_win_ip_label = Label(self.set_ip_frame, text="Set Custom IP:")
         self.enter_win_ip = Entry(self.set_ip_frame, width=14, validate="focusin")
         self.set_win_ip_button = Button(self.set_ip_frame, text="Set", command=self.set_win_ip)
 
@@ -152,6 +152,7 @@ class MainW(Tk):
         # Look at the output and grab the ethernet connection name and address
         for (i,x) in enumerate(output):
             if 'Ethernet' in x:
+
                 self.interfaceName = '"' + x.split("adapter ")[1][:-1] + '"'
                 # i+2 to skip the '' and go to next index
                 for (j,y) in enumerate(output[i+2:]):
@@ -160,7 +161,11 @@ class MainW(Tk):
                         y = y.split(": ")
                         self.win_eth_ip = y[1]
                         break
+                # If we didnt get the ip yet, check another connection
+                if self.win_eth_ip == "":
+                    continue
                 break
+
 
         # Successful Connection
         if self.win_eth_ip != "":

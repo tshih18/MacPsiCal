@@ -34,11 +34,11 @@ class MainW(Tk):
         #'networksetup -setnetworkserviceenabled Thunderbolt\ Ethernet on'
 
     def InitFrames(self):
-        self.instructions = Label(self, text="Please enter the IP address displayed below and click start before running PSI Calibration")
+        self.instructions = Label(self, text="Please enter the IP address displayed below and click start before running PSI Calibration.\nWhen reconnecting, please wait a couple seconds for the computer to recognize the port.")
         self.mac_ip = Label(self, textvariable=self.display_mac_eth_ip)
 
         self.set_ip_frame = Frame(self, height=50, width=200)
-        self.set_mac_ip_label = Label(self.set_ip_frame, text="Set Static IP:")
+        self.set_mac_ip_label = Label(self.set_ip_frame, text="Set Custom IP:")
         self.enter_mac_ip = Entry(self.set_ip_frame, width=12, validate="focusin")
         self.set_mac_ip_button = Button(self.set_ip_frame, text="Set", command=self.set_mac_ip)
 
@@ -145,11 +145,11 @@ class MainW(Tk):
         # Grab the ethernet port number
         for port in self.output:
             port = port.split('\n')
-            if "Thunderbolt" in port[0]:
+            # Let it check for thunderbolt or usb connection
+            if "Thunderbolt Ethernet" in port[0] or " LAN" in port[0]:
                 self.interfaceName = port[0].split(': ')[1]
                 self.device = port[1].split(' ')[1]
                 break
-
 
         # Successful Connection
         try:
