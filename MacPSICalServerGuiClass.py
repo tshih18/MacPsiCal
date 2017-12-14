@@ -69,11 +69,11 @@ class MainW(Tk):
         # Buttons
         self.button_frame = Frame(self, height=50, width=200)
         self.connect_button = Button(self, text="Connect", width=7)
-        self.connect_button.config(command=lambda: self.get_ip(), anchor=E)
+        self.connect_button.config(command=lambda: self.get_ip())
         self.start_button = Button(self.button_frame, text="Start")
-        self.start_button.config(command=self.run_script, anchor=W, width=5)
+        self.start_button.config(command=self.run_script, width=5)
         self.stop_button = Button(self.button_frame, text="Exit", state=DISABLED)
-        self.stop_button.config(command=self.stop_script, anchor=E, width=5)
+        self.stop_button.config(command=self.stop_script, width=5)
 
         self.feedback = Label(self, textvariable=self.message)
 
@@ -270,7 +270,12 @@ class MainW(Tk):
         self.message.set("Stopped server")
         self.update()
         '''
-        sys.exit(1)
+
+        # Destroy Tkinter GUI and exit program
+        self.destroy()
+        sys.exit(0)
+
+        # Re-execute the script
         #os.execv(__file__, sys.argv)
 
 

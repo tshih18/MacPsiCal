@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from Tkinter import *
 import socket
 import base64
@@ -14,7 +16,7 @@ class MainW(Tk):
         Tk.__init__(self,parent)
         self.parent = parent
         self.title("PSI Calibration")
-        self.geometry("400x130")
+        self.geometry("350x120")
         self.TCP_PORT = 5050
         self.BUFFER_SIZE = 1024
 
@@ -27,7 +29,7 @@ class MainW(Tk):
         self.PlaceFrames()
 
         # Get ip address and update GUI with connection status
-        self.get_win_ip()
+        self.get_ip()
 
     def InitFrames(self):
         # Initialize popup balloons
@@ -46,27 +48,27 @@ class MainW(Tk):
         self.balloon.bind(self.help, help_messages)
 
         # Display ip address
-        self.ip = Label(self, textvariable=self.display_mac_eth_ip)
+        self.ip = Label(self, textvariable=self.display_win_eth_ip)
 
         # Set ip address
         self.set_ip_frame = Frame(self, height=50, width=200)
         self.set_ip_label = Label(self.set_ip_frame, text="Set Custom IP:")
-        self.enter_ip = Entry(self.set_ip_frame, width=12, validate="focusin")
+        self.enter_ip = Entry(self.set_ip_frame, width=15, validate="focusin")
         self.set_ip_button = Button(self.set_ip_frame, text="Set", command=self.set_ip)
 
         # Buttons
         self.button_frame = Frame(self, height=50, width=200)
         self.connect_button = Button(self, text="Connect", width=7)
-        self.connect_button.config(command=lambda: self.get_ip(), anchor=E)
+        self.connect_button.config(command=lambda: self.get_ip())
         self.start_button = Button(self.button_frame, text="Start")
-        self.start_button.config(command=self.run_script, anchor=W, width=5)
+        self.start_button.config(command=self.run_script, width=5)
         self.stop_button = Button(self.button_frame, text="Exit", state=DISABLED)
-        self.stop_button.config(command=self.stop_script, anchor=E, width=5)
+        self.stop_button.config(command=self.stop_script, width=5)
 
         self.feedback = Label(self, textvariable=self.message)
 
     def PlaceFrames(self):
-        self.help.grid(row=0, column=0, sticky=E, padx=10)
+        self.help.grid(row=0, column=0, sticky=E)
         self.ip.grid(row=0, column=0)
 
         self.set_ip_frame.grid(row=1, column=0, padx=67)
@@ -87,7 +89,7 @@ class MainW(Tk):
         # Create an INET, STREAMing socket
         serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # Allow the socket to use same PORT address
-        self.serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         # Bind the socket to host and a port.
         # '' means socket is reachable by any address the machine happens to have
         serverSocket.bind(('', TCP_PORT))
@@ -156,21 +158,21 @@ class MainW(Tk):
         print("Successfully sent data in", time.time() - start_time, "seconds")
 
 
-    def set_win_ip(self):
-        check_output('netsh interface ip set address '+ self.interfaceName + ' static ' + self.enter_win_ip.get() + ' 255.255.255.0 8.8.8.8')
+    def set_ip(self):
+        check_output('netsh interface ip set address '+ self.interfaceName + ' static ' + self.enter_ip.get() + ' 255.255.255.0 8.8.8.8')
         # Display new ip address
         start_time = time.time()
-        self.set_win_ip_button.config(state=DISABLED)
-        while self.get_win_ip() == "N/A":
+        self.set_ip_button.config(state=DISABLED)
+        while self.get_ip() == "N/A":
             if time.time() - start_time > 5:
                 self.message.set("Unable to set Ip, make sure Ethernet cable is connected")
                 self.update()
                 break
-            self.get_win_ip()
-        self.set_win_ip_button.config(state=NORMAL)
+            self.get_ip()
+        self.set_ip_button.config(state=NORMAL)
 
     # Get windows's ethernet ip address
-    def get_win_ip(self):
+    def get_ip(self):
         # Run command to list all network connections
         output = check_output(['ipconfig'])
         output = output.split('\r\n')
@@ -198,9 +200,9 @@ class MainW(Tk):
         if self.win_eth_ip != "":
             # Update the message and button, and display the ip
             print("Ethernet cable connected to Pi")
-            self.message.set("Click to start server")
+            self.message.set("Program is ready to start")
             self.start_button.config(state=NORMAL)
-            self.display_win_eth_ip.set(self.win_eth_ip)
+            self.display_win_eth_ip.set("My IP: " + self.win_eth_ip)
             self.update()
 
         # Unsuccessful Connection
@@ -212,7 +214,7 @@ class MainW(Tk):
             self.message.set("Ethernet cable not connected to Pi")
             self.start_button.config(state=DISABLED)
             self.connect_button.config(state=NORMAL)
-            self.display_win_eth_ip.set(self.win_eth_ip)
+            self.display_win_eth_ip.set("My IP: " + self.win_eth_ip)
             self.update()
 
         return self.win_eth_ip
@@ -253,8 +255,12 @@ class MainW(Tk):
         self.message.set("Stopped server")
         self.update()
         '''
-        sys.exit(1)
+
+        # Destroy Tkinter GUI and exit program
+        self.destroy()
+        sys.exit(0)
         #os.execv(__file__, sys.argv)
+
 
 def isUserAdmin():
     if os.name == 'nt':
@@ -316,17 +322,6 @@ def runAsAdmin(cmdLine=None, wait=True):
 
     return rc
 
-def test():
-    rc = 0
-    if not self.isUserAdmin():
-        print "You're not an admin.", os.getpid(), "params: ", sys.argv
-        #rc = runAsAdmin(["c:\\Windows\\notepad.exe"])
-        rc = self.runAsAdmin()
-    else:
-        print "You are an admin!", os.getpid(), "params: ", sys.argv
-        rc = 0
-    x = raw_input('Press Enter to exit.')
-    return rc
 
 if __name__ == "__main__":
     # If not running as admin, re-run script as admin
