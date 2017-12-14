@@ -6,13 +6,14 @@ import os
 import time
 import sys
 import pexpect
+import Pmw
 
 class MainW(Tk):
     def __init__(self,parent):
         Tk.__init__(self,parent)
         self.parent = parent
-        self.title("PSI Cal Server GUI")
-
+        self.title("PSI Calibration")
+        self.geometry("400x140")
         self.TCP_PORT = 5050
         self.BUFFER_SIZE = 1024
 
@@ -34,32 +35,49 @@ class MainW(Tk):
         #'networksetup -setnetworkserviceenabled Thunderbolt\ Ethernet on'
 
     def InitFrames(self):
-        self.instructions = Label(self, text="When setting up for the first time, go to settings and enter the IP address displayed below.\nStart the server before running PSI Calibration")
+        # Initialize popup balloons
+        self.balloon = Pmw.Balloon(self)
+
+        # Help popop box
+        self.help = Label(self, text="Help")
+        help_title = "Setup Instructions\n"
+        help_1 = "1. Connect ethernet cable to the computer and raspberry pi.\n"
+        help_2 = "2. If this is your first time setting up or if you are switching to another computer, set a custom ip address.\n"
+        help_3 = "3. On the raspberry pi, check the box to process on computer.\n"
+        help_4 = "4. On the raspberry pi, go to the settings page and enter the ip address displayed on the computer.\n"
+        help_5 = "5. Click start before running PSI Calibration on the raspberry pi."
+        help_messages = help_title + help_1 + help_2 + help_3 + help_4 + help_5
+        self.balloon.bind(self.help, help_messages)
+
+        # Display ip address
         self.mac_ip = Label(self, textvariable=self.display_mac_eth_ip)
 
+        # Set ip address
         self.set_ip_frame = Frame(self, height=50, width=200)
         self.set_mac_ip_label = Label(self.set_ip_frame, text="Set Custom IP:")
         self.enter_mac_ip = Entry(self.set_ip_frame, width=12, validate="focusin")
         self.set_mac_ip_button = Button(self.set_ip_frame, text="Set", command=self.set_mac_ip)
 
+        # Buttons
         self.start_button = Button(self, text="Start")
         self.start_button.config(command=self.run_script, anchor=W)
-        self.reconnect_button = Button(self, text="Reconnect")
-        self.reconnect_button.config(command=lambda: self.get_mac_ip(), anchor=E)
+        self.connect_button = Button(self, text="Connect")
+        self.connect_button.config(command=lambda: self.get_mac_ip(), anchor=E)
+
         self.feedback = Label(self, textvariable=self.message)
 
     def PlaceFrames(self):
-        self.instructions.grid(row=0, column=0)
-        self.mac_ip.grid(row=1, column=0)
+        self.help.grid(row=0, column=0, sticky=E, padx=30)
+        self.mac_ip.grid(row=0, column=0)
 
-        self.set_ip_frame.grid(row=2, column=0)
-        self.set_mac_ip_label.grid(row=2, column=0)
-        self.enter_mac_ip.grid(row=2, column=1)
-        self.set_mac_ip_button.grid(row=2, column=2)
+        self.set_ip_frame.grid(row=1, column=0, padx=67)
+        self.set_mac_ip_label.grid(row=1, column=0)
+        self.enter_mac_ip.grid(row=1, column=1)
+        self.set_mac_ip_button.grid(row=1, column=2)
 
-        self.start_button.grid(row=3, column=0)
-        self.reconnect_button.grid(row=4, column=0)
-        self.feedback.grid(row=5, column=0)
+        self.start_button.grid(row=2, column=0)
+        self.connect_button.grid(row=3, column=0)
+        self.feedback.grid(row=4, column=0, padx=20)
 
     # Becomes server and gets the parameters and ip from pi
     def read_from_pi(self, TCP_PORT, BUFFER_SIZE):
@@ -160,7 +178,7 @@ class MainW(Tk):
             # Update message and button, and display the ip
             self.message.set("Click to start server")
             self.start_button.config(state=NORMAL)
-            self.display_mac_eth_ip.set(self.mac_eth_ip)
+            self.display_mac_eth_ip.set("My IP:" + self.mac_eth_ip)
             self.update()
 
             return self.mac_eth_ip
@@ -173,8 +191,8 @@ class MainW(Tk):
             # Update message and buttons, and display N/A ip
             self.message.set("Ethernet cable not connected to Pi")
             self.start_button.config(state=DISABLED)
-            self.reconnect_button.config(state=NORMAL)
-            self.display_mac_eth_ip.set(self.mac_eth_ip)
+            self.connect_button.config(state=NORMAL)
+            self.display_mac_eth_ip.set("My IP: " + self.mac_eth_ip)
             self.update()
 
             return self.mac_eth_ip
@@ -205,10 +223,11 @@ class MainW(Tk):
         self.start_button.config(state=DISABLED)
         self.message.set("Server running... Now continue PSI calibration on the Pi")
         self.update()
-        while True:
-            (self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin, self.pi_eth_ip) = self.read_from_pi(self.TCP_PORT, self.BUFFER_SIZE)
-            self.offset_list = self.psi_cal(self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin)
-            self.send_to_pi(self.pi_eth_ip, self.TCP_PORT, self.offset_list)
+
+        #while True:
+        (self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin, self.pi_eth_ip) = self.read_from_pi(self.TCP_PORT, self.BUFFER_SIZE)
+        self.offset_list = self.psi_cal(self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin)
+        self.send_to_pi(self.pi_eth_ip, self.TCP_PORT, self.offset_list)
 
 
 if __name__ == "__main__":

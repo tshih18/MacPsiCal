@@ -27,35 +27,49 @@ class MainW(Tk):
         self.get_win_ip()
 
     def InitFrames(self):
-        self.instructions = Label(self, text="Please enter the IP address displayed below and click start before running PSI Calibration.\nWhen reconnecting, please wait a couple seconds for the computer to recognize the port.")
-        self.win_ip = Label(self, textvariable=self.display_win_eth_ip)
+        # Initialize popup balloons
+        self.balloon = Pmw.Balloon(self)
 
+        # Help popop box
+        self.help = Label(self, text="Help")
+        help_title = "Setup Instructions\n"
+        help_1 = "1. Connect ethernet cable to the computer and raspberry pi.\n"
+        help_2 = "2. If this is your first time setting up or if you are switching to another computer, set a custom ip address.\n"
+        help_3 = "3. Check the box to process on computer.\n"
+        help_4 = "4. Go to the settings page and enter the ip address displayed on the computer.\n"
+        help_5 = "5. Click start before running PSI Calibration on the raspberry pi."
+        help_messages = help_title + help_1 + help_2 + help_3 + help_4 + help_5
+        self.balloon.bind(self.help, help_messages)
+
+        # Display ip address
+        self.mac_ip = Label(self, textvariable=self.display_mac_eth_ip)
+
+        # Set ip address
         self.set_ip_frame = Frame(self, height=50, width=200)
-        self.set_win_ip_label = Label(self.set_ip_frame, text="Set Custom IP:")
-        self.enter_win_ip = Entry(self.set_ip_frame, width=14, validate="focusin")
-        self.set_win_ip_button = Button(self.set_ip_frame, text="Set", command=self.set_win_ip)
+        self.set_mac_ip_label = Label(self.set_ip_frame, text="Set Custom IP:")
+        self.enter_mac_ip = Entry(self.set_ip_frame, width=12, validate="focusin")
+        self.set_mac_ip_button = Button(self.set_ip_frame, text="Set", command=self.set_mac_ip)
 
-        self.button_frame = Frame(self, height=50, width=200)
-        self.button_frame.pack_propagate(0) # don't shrink
-        self.start_button = Button(self.button_frame, text="Start")
+        # Buttons
+        self.start_button = Button(self, text="Start")
         self.start_button.config(command=self.run_script, anchor=W)
-        self.reconnect_button = Button(self.button_frame, text="Reconnect")
-        self.reconnect_button.config(command=lambda: self.get_win_ip(), anchor=E)
+        self.connect_button = Button(self, text="Connect")
+        self.connect_button.config(command=lambda: self.get_mac_ip(), anchor=E)
+
         self.feedback = Label(self, textvariable=self.message)
 
     def PlaceFrames(self):
-        self.instructions.grid(row=0, column=0)
-        self.win_ip.grid(row=1, column=0)
+        self.help.grid(row=0, column=0, sticky=E)
+        self.mac_ip.grid(row=0, column=0)
 
-        self.set_ip_frame.grid(row=2, column=0)
-        self.set_win_ip_label.grid(row=2, column=0)
-        self.enter_win_ip.grid(row=2, column=1)
-        self.set_win_ip_button.grid(row=2, column=3)
+        self.set_ip_frame.grid(row=1, column=0, padx=8)
+        self.set_mac_ip_label.grid(row=1, column=0)
+        self.enter_mac_ip.grid(row=1, column=1)
+        self.set_mac_ip_button.grid(row=1, column=2)
 
-        self.button_frame.grid(row=3, column=0)
-        self.start_button.grid(row=3, column=0)
-        self.reconnect_button.grid(row=4, column=0)
-        self.feedback.grid(row=5, column=0)
+        self.start_button.grid(row=2, column=0)
+        self.connect_button.grid(row=3, column=0)
+        self.feedback.grid(row=4, column=0)
 
     # Becomes server and gets the parameters and ip from pi
     def read_from_pi(self, TCP_PORT, BUFFER_SIZE):
@@ -184,7 +198,7 @@ class MainW(Tk):
             # Update messages and buttons, and display N/A ip
             self.message.set("Ethernet cable not connected to Pi")
             self.start_button.config(state=DISABLED)
-            self.reconnect_button.config(state=NORMAL)
+            self.connect_button.config(state=NORMAL)
             self.display_win_eth_ip.set(self.win_eth_ip)
             self.update()
 
