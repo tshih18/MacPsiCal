@@ -8,6 +8,7 @@ import argparse
 import re
 import ast
 import netifaces as ni
+from random import *
 
 in_development = True
 
@@ -21,6 +22,7 @@ def send_to_computer(TCP_IP, TCP_PORT, pi_eth_ip, IMAGE_FILE, parameters):
         encoded_string = base64.b64encode(image_file.read())
 
     # Create an INET, STREAMing socket and connect to TCP_IP on port TCP_PORT
+    
     clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     if in_development: print "Connecting to", TCP_IP, "at port", TCP_PORT
     clientSocket.connect((TCP_IP, TCP_PORT))
@@ -58,6 +60,8 @@ def read_from_computer(TCP_PORT, BUFFER_SIZE):
 
     # Create an INET, STREAMing socket
     serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # Allow the socket to use same PORT address
+    serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     serverSocket.bind(('', TCP_PORT))
     if in_development: print "Socket hostname:", socket.gethostname()
     serverSocket.listen(1)
@@ -158,8 +162,8 @@ if __name__ == '__main__':
         print "Pi's ip changed to", new_ip
     
     TCP_IP = args["ip"]
-    TCP_PORT = 5050
     BUFFER_SIZE = 1024
+    TCP_PORT = 5050
 
     # Format parameters to send to computer
     parameters = "," + str(args["width"]) + "," + str(args["desiredwidth"]) + "," + str(args["spsi"]) + "," + str(args["ppmm"]) + "," + str(args["margin"])
