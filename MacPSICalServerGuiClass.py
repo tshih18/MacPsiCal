@@ -3,9 +3,7 @@ from Tkinter import *
 import socket
 import base64
 from subprocess import *
-import os
 import time
-import sys
 import pexpect
 import Pmw
 import threading
@@ -106,6 +104,7 @@ class MainW(Tk):
         serverSocket.bind(('', TCP_PORT))
         print("Socket hostname:", socket.gethostname())
 
+        # Stay in this loop while the thread attribute is true
         while self.thread.do_run:
             try:
                 # Become a server socket
@@ -114,8 +113,11 @@ class MainW(Tk):
                 # Accept connections from outside
                 (clientsocket, addr) = serverSocket.accept()
                 print('Connection address:', addr)
-                data = ""
 
+                # When connection has been established and data is transferring, disable stop button
+                self.stop_button.config(state=DISABLED)
+
+                data = ""
                 while 1:
                     # Put in try/except block to wait for resource to free up
                     try:
@@ -125,9 +127,10 @@ class MainW(Tk):
                     except socket.error, e:
                         if str(e) == "[Errno 35] Resource temporarily unavailable":
                             time.sleep(0.1)
+                        elif "[Errno 10035]" in str(e):
+                            time.sleep(0.1)
                         else:
                             raise e
-                            #continue
 
                 clientsocket.close()
                 # print "Data:", data
@@ -281,6 +284,8 @@ class MainW(Tk):
                 break
             self.offset_list = self.psi_cal(self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin)
             self.send_to_pi(self.pi_eth_ip, self.TCP_PORT , self.offset_list)
+
+            self.stop_button.config(state=NORMAL)
 
     # Stops the thread process when stop is clicked
     def stop_script(self):

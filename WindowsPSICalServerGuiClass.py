@@ -62,7 +62,7 @@ class MainW(Tk):
         self.connect_button.config(command=lambda: self.get_ip())
         self.start_button = Button(self.button_frame, text="Start")
         self.start_button.config(command=self.run_script, width=5)
-        self.stop_button = Button(self.button_frame, text="Exit", state=DISABLED)
+        self.stop_button = Button(self.button_frame, text="Stop", state=DISABLED)
         self.stop_button.config(command=self.stop_script, width=5)
 
         self.feedback = Label(self, textvariable=self.message)
@@ -105,8 +105,11 @@ class MainW(Tk):
                 # Accept connections from outside
                 (clientsocket, addr) = serverSocket.accept()
                 print('Connection address:', addr)
-                data = ""
 
+                # When connection has been established and data is transferring, disable stop button
+                self.stop_button.config(state=DISABLED)
+
+                data = ""
                 while 1:
                     # Put in try/except block to wait for resource to free up
                     try:
@@ -115,6 +118,8 @@ class MainW(Tk):
                         if data[-3:] == 'END': break
                     except socket.error, e:
                         if str(e) == "[Errno 35] Resource temporarily unavailable":
+                            time.sleep(0.1)
+                        elif "[Errno 10035]" in str(e):
                             time.sleep(0.1)
                         else:
                             raise e
@@ -266,6 +271,8 @@ class MainW(Tk):
                 break
             self.offset_list = self.psi_cal(self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin)
             self.send_to_pi(self.pi_eth_ip, self.TCP_PORT , self.offset_list)
+
+            self.stop_button.config(state=NORMAL)
 
     # Stops the thread process when stop is clicked
     def stop_script(self):
