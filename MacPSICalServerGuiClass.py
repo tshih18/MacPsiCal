@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 from Tkinter import *
 import socket
 import base64
@@ -48,12 +47,12 @@ class MainW(Tk):
         # Help popop box
         self.help = Label(self, text="Help")
         help_title = "Setup Instructions\n"
-        help_1 = "1. Connect ethernet cable to the computer and raspberry pi.\n"
+        help_1 = "1. Connect ethernet cable to the computer and raspberry pi and click connect.\n"
         help_2 = "2. If this is your first time setting up or if you are switching to another computer, set a custom ip address.\n"
         help_3 = "3. On the raspberry pi, check the box to process on computer.\n"
         help_4 = "4. On the raspberry pi, go to the settings page and enter the ip address displayed on the computer.\n"
         help_5 = "5. Click start before running PSI Calibration on the raspberry pi.\n"
-        help_6 = "6. After calibration is complete, click exit to quit the application."
+        help_6 = "6. After calibration is complete, click stop to stop the program."
         help_messages = help_title + help_1 + help_2 + help_3 + help_4 + help_5 + help_6
         self.balloon.bind(self.help, help_messages)
 
@@ -72,7 +71,7 @@ class MainW(Tk):
         self.connect_button.config(command=lambda: self.get_ip())
         self.start_button = Button(self.button_frame, text="Start")
         self.start_button.config(command=self.run_script, width=5)
-        self.stop_button = Button(self.button_frame, text="Exit", state=DISABLED)
+        self.stop_button = Button(self.button_frame, text="Stop", state=DISABLED)
         self.stop_button.config(command=self.stop_script, width=5)
 
         self.feedback = Label(self, textvariable=self.message)
@@ -100,45 +99,61 @@ class MainW(Tk):
         serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # Allow the socket to use same PORT address
         serverSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # Set timeout for 3 seconds
+        serverSocket.settimeout(3)
         # Bind the socket to host and a port.
         # '' means socket is reachable by any address the machine happens to have
         serverSocket.bind(('', TCP_PORT))
         print("Socket hostname:", socket.gethostname())
-        # Become a server socket
-        serverSocket.listen(1)
-        print("Waiting for a connection...")
-        # Accept connections from outside
-        (clientsocket, addr) = serverSocket.accept()
-        print('Connection address:', addr)
-        data = ""
 
-        while 1:
-            data += clientsocket.recv(BUFFER_SIZE)
-            if not data: break
-            if data[-3:] == 'END': break
+        while self.thread.do_run:
+            try:
+                # Become a server socket
+                serverSocket.listen(1)
+                print("Waiting for a connection...")
+                # Accept connections from outside
+                (clientsocket, addr) = serverSocket.accept()
+                print('Connection address:', addr)
+                data = ""
 
-        clientsocket.close()
-        # print "Data:", data
+                while 1:
+                    # Put in try/except block to wait for resource to free up
+                    try:
+                        data += clientsocket.recv(BUFFER_SIZE)
+                        if not data: break
+                        if data[-3:] == 'END': break
+                    except socket.error, e:
+                        if str(e) == "[Errno 35] Resource temporarily unavailable":
+                            time.sleep(0.1)
+                        else:
+                            raise e
+                            #continue
 
-        # Organize data into variables
-        parameters = data.split(',')
-        image = parameters[0]
-        width = parameters[1]
-        desiredWidth = parameters[2]
-        spsi = parameters[3]
-        ppmm = parameters[4]
-        margin = parameters[5]
-        pi_eth_ip = parameters[6]
-        print("Parameters:", (width, desiredWidth, spsi, ppmm, margin))
+                clientsocket.close()
+                # print "Data:", data
 
-        decoded_data = base64.b64decode(image)
-        #print "Decoded data:", decoded_data
+                # Organize data into variables
+                parameters = data.split(',')
+                image = parameters[0]
+                width = parameters[1]
+                desiredWidth = parameters[2]
+                spsi = parameters[3]
+                ppmm = parameters[4]
+                margin = parameters[5]
+                pi_eth_ip = parameters[6]
+                print("Parameters:", (width, desiredWidth, spsi, ppmm, margin))
 
-        # Create writable image and write the decoding result
-        image_result = open('image_decode.png', 'wb')
-        image_result.write(decoded_data)
+                decoded_data = base64.b64decode(image)
+                #print "Decoded data:", decoded_data
 
-        return (width, desiredWidth, spsi, ppmm, margin, pi_eth_ip)
+                # Create writable image and write the decoding result
+                image_result = open('image_decode.png', 'wb')
+                image_result.write(decoded_data)
+
+                return (width, desiredWidth, spsi, ppmm, margin, pi_eth_ip)
+            except socket.error, e:
+                print "Error:", e
+
 
     # Run psi cal and get the values
     def psi_cal(self, width, desiredWidth, spsi, ppmm, margin):
@@ -194,6 +209,8 @@ class MainW(Tk):
             # Update message and button, and display the ip
             self.message.set("Program is ready to start")
             self.start_button.config(state=NORMAL)
+            self.set_ip_button.config(state=NORMAL)
+            self.enter_ip.config(state=NORMAL)
             self.display_mac_eth_ip.set("My IP: " + self.mac_eth_ip)
             self.update()
 
@@ -207,6 +224,8 @@ class MainW(Tk):
             # Update message and buttons, and display N/A ip
             self.message.set("Ethernet cable not connected to Pi")
             self.start_button.config(state=DISABLED)
+            self.set_ip_button.config(state=DISABLED)
+            self.enter_ip.config(state=DISABLED)
             self.connect_button.config(state=NORMAL)
             self.display_mac_eth_ip.set("My IP: " + self.mac_eth_ip)
             self.update()
@@ -237,6 +256,8 @@ class MainW(Tk):
     # Runs the entire script when start is clicked
     def run_script(self):
         self.start_button.config(state=DISABLED)
+        self.enter_ip.config(state=DISABLED)
+        self.set_ip_button.config(state=DISABLED)
         self.connect_button.config(state=DISABLED)
         self.stop_button.config(state=NORMAL)
         self.message.set("Program running... continue PSI calibration on the Pi")
@@ -247,36 +268,34 @@ class MainW(Tk):
         # Set thread as daemon so thread is terminated when main thread ends
         self.thread.daemon = True
         self.thread.start()
+        self.thread.do_run = True
 
     # Thread that runs server
     def run(self):
-        while True:
-            (self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin, self.pi_eth_ip) = self.read_from_pi(self.TCP_PORT, self.BUFFER_SIZE)
+        self.currThread = threading.currentThread()
+        while getattr(self.currThread, "do_run", True):
+            try:
+                (self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin, self.pi_eth_ip) = self.read_from_pi(self.TCP_PORT, self.BUFFER_SIZE)
+            except TypeError, e:
+                print "Error:", e
+                break
             self.offset_list = self.psi_cal(self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin)
             self.send_to_pi(self.pi_eth_ip, self.TCP_PORT , self.offset_list)
 
+    # Stops the thread process when stop is clicked
     def stop_script(self):
-        '''
-        # Create a stop event
-        self._stopevent = threading.Event()
-        self._stopevent.set()
-
-        threading.Thread.join(self.thread, 1)
-        print self.thread.isAlive()
-
-        if self.serverSocket:
-            self.serverSocket.close()
+        self.message.set("Stopping server...")
+        self.update()
+        # Toggle the buttons
         self.stop_button.config(state=DISABLED)
+        self.connect_button.config(state=NORMAL)
+        # Set the thread attribute to False to signal stop
+        self.thread.do_run = False
+        # Join thread with main thread to end thread
+        threading.Thread.join(self.thread, 1)
         self.message.set("Stopped server")
         self.update()
-        '''
 
-        # Destroy Tkinter GUI and exit program
-        self.destroy()
-        sys.exit(0)
-
-        # Re-execute the script
-        #os.execv(__file__, sys.argv)
 
 
 if __name__ == "__main__":
