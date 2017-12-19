@@ -1,12 +1,14 @@
-#!/usr/bin/env python
+
 from Tkinter import *
 import socket
 import base64
 from subprocess import *
 import time
 import pexpect
-import Pmw
 import threading
+import Pmw
+import os
+import sys
 
 class MainW(Tk):
     def __init__(self,parent):
@@ -16,6 +18,9 @@ class MainW(Tk):
         self.geometry("400x130")
         self.TCP_PORT = 5050
         self.BUFFER_SIZE = 1024
+
+        self.curr_dir = os.getcwd()
+        print self.curr_dir
 
         # Initialize messages to display to user
         self.message = StringVar()
@@ -31,13 +36,6 @@ class MainW(Tk):
         # Get ip address and update GUI with connection status
         self.get_ip()
 
-        # enable internet sharing on ethernet thunderbolt
-        #'networksetup -setnetworkserviceenabled Thunderbolt\ Ethernet on'
-
-        # Modify argument's mode
-        child = pexpect.spawn('chmod a+x MacPSICalServerGuiClass.py')
-        child.expect(pexpect.EOF)
-
     def InitFrames(self):
         # Initialize popup balloons
         self.balloon = Pmw.Balloon(self)
@@ -49,7 +47,7 @@ class MainW(Tk):
         help_2 = "2. If this is your first time setting up or if you are switching to another computer, set a custom ip address.\n"
         help_3 = "3. On the raspberry pi, check the box to process on computer.\n"
         help_4 = "4. On the raspberry pi, go to the settings page and enter the ip address displayed on the computer.\n"
-        help_5 = "5. Click start before running PSI Calibration on the raspberry pi.\n"
+        help_5 = "5. On the computer, click start before running PSI Calibration on the raspberry pi.\n"
         help_6 = "6. After calibration is complete, click stop to stop the program."
         help_messages = help_title + help_1 + help_2 + help_3 + help_4 + help_5 + help_6
         self.balloon.bind(self.help, help_messages)
@@ -106,6 +104,7 @@ class MainW(Tk):
 
         # Stay in this loop while the thread attribute is true
         while self.thread.do_run:
+            # Want to catch timeout error
             try:
                 # Become a server socket
                 serverSocket.listen(1)
@@ -117,16 +116,20 @@ class MainW(Tk):
                 # When connection has been established and data is transferring, disable stop button
                 self.stop_button.config(state=DISABLED)
 
+                self.message.set("Receiving data from pi")
+                self.update()
                 data = ""
                 while 1:
-                    # Put in try/except block to wait for resource to free up
+                    # Let the socket sleep during exeption to free up resource
                     try:
                         data += clientsocket.recv(BUFFER_SIZE)
                         if not data: break
                         if data[-3:] == 'END': break
                     except socket.error, e:
-                        if str(e) == "[Errno 35] Resource temporarily unavailable":
+                        # Handle resource temporarily unavilable exception
+                        if "[Errno 35]" in str(e):
                             time.sleep(0.1)
+                        # Handle address already in use error
                         elif "[Errno 10035]" in str(e):
                             time.sleep(0.1)
                         else:
@@ -146,11 +149,11 @@ class MainW(Tk):
                 pi_eth_ip = parameters[6]
                 print("Parameters:", (width, desiredWidth, spsi, ppmm, margin))
 
+                # Decode the image data
                 decoded_data = base64.b64decode(image)
-                #print "Decoded data:", decoded_data
-
                 # Create writable image and write the decoding result
-                image_result = open('image_decode.png', 'wb')
+                #image_result = open('image_decode.png', 'wb')
+                image_result = open(os.path.join(sys._MEIPASS, 'image_decode.png'), 'wb')
                 image_result.write(decoded_data)
 
                 return (width, desiredWidth, spsi, ppmm, margin, pi_eth_ip)
@@ -161,11 +164,25 @@ class MainW(Tk):
     # Run psi cal and get the values
     def psi_cal(self, width, desiredWidth, spsi, ppmm, margin):
         print("Running PSI Calibration Code...")
+        self.message.set("Running PSI calibration algorithm")
+        self.update()
+
         start_time = time.time()
-        offset_list = check_output(['python', 'saveme1.py', '--image', 'image_decode.png', '--width', width, '--desiredwidth', desiredWidth, '--spsi', spsi, '--ppmm', ppmm, '--margin', margin])
-        print("PSI Calibration Code took", time.time() - start_time, "seconds")
-        print("Output:", offset_list)
-        return offset_list
+        # Want to catch excpetion when there is a bad picture
+        try:
+            #offset_list = check_output(['/Users/theodoreshih/Desktop/Work/PyInstallerMac/dist/MacPSICalServerGuiClass.app/Contents/Resources/saveme1', '--image', '/Users/theodoreshih/Desktop/Work/PyInstallerMac/dist/MacPSICalServerGuiClass.app/Contents/Resources/image_decode.png', '--width', width, '--desiredwidth', desiredWidth, '--spsi', spsi, '--ppmm', ppmm, '--margin', margin])
+            offset_list = check_output([os.path.join(sys._MEIPASS, 'saveme1'), '--image', os.path.join(sys._MEIPASS, 'image_decode.png'), '--width', width, '--desiredwidth', desiredWidth, '--spsi', spsi, '--ppmm', ppmm, '--margin', margin])
+
+            print("PSI calibration code took", time.time() - start_time, "seconds")
+            print("Output:", offset_list)
+            return offset_list
+        except Exception as e:
+            print "Algorithm failed. Please restart PSI calibration."
+            print e
+            self.message.set("Algorithm failed. Please restart PSI calibration.")
+            self.update()
+            self.stop_button.config(state=NORMAL)
+
 
     # Becomes client and sends the values back to the pi
     def send_to_pi(self, TCP_IP, TCP_PORT, offset_list):
@@ -207,7 +224,7 @@ class MainW(Tk):
         try:
             # Get the ip address associated with the ethernet port number
             self.mac_eth_ip = check_output(['ipconfig', 'getifaddr', self.device])[:-1]
-            print("Ethernet cable connected to Pi")
+            print("Ethernet cable is connected to Pi")
 
             # Update message and button, and display the ip
             self.message.set("Program is ready to start")
@@ -221,11 +238,11 @@ class MainW(Tk):
 
         # Unsuccessful Connection
         except Exception:
-            print("Ethernet cable not connected to Pi")
+            print("Ethernet cable is not connected to Pi")
             self.mac_eth_ip = "N/A"
 
             # Update message and buttons, and display N/A ip
-            self.message.set("Ethernet cable not connected to Pi")
+            self.message.set("Ethernet cable is not connected to Pi")
             self.start_button.config(state=DISABLED)
             self.set_ip_button.config(state=DISABLED)
             self.enter_ip.config(state=DISABLED)
@@ -250,7 +267,7 @@ class MainW(Tk):
         start_time = time.time()
         while self.get_ip() == "N/A":
             if time.time() - start_time > 3:
-                self.message.set("Unable to set Ip, make sure Ethernet cable is connected")
+                self.message.set("Unable to set Ip, make sure ethernet cable is connected")
                 self.update()
                 break
             self.get_ip()
@@ -258,6 +275,7 @@ class MainW(Tk):
 
     # Runs the entire script when start is clicked
     def run_script(self):
+        # Configure GUI
         self.start_button.config(state=DISABLED)
         self.enter_ip.config(state=DISABLED)
         self.set_ip_button.config(state=DISABLED)
@@ -276,14 +294,19 @@ class MainW(Tk):
     # Thread that runs server
     def run(self):
         self.currThread = threading.currentThread()
+        # Run script while the thread attribute is true
         while getattr(self.currThread, "do_run", True):
+            # Want to catch return value error when thread ends and break loop
             try:
                 (self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin, self.pi_eth_ip) = self.read_from_pi(self.TCP_PORT, self.BUFFER_SIZE)
+                self.offset_list = self.psi_cal(self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin)
+                self.send_to_pi(self.pi_eth_ip, self.TCP_PORT , self.offset_list)
+
+                self.message.set("PSI calibration is finished")
+                self.update()
             except TypeError, e:
                 print "Error:", e
                 break
-            self.offset_list = self.psi_cal(self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin)
-            self.send_to_pi(self.pi_eth_ip, self.TCP_PORT , self.offset_list)
 
             self.stop_button.config(state=NORMAL)
 

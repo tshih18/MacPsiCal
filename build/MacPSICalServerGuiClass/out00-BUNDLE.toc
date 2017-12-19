@@ -1,0 +1,3 @@
+([('MacPSICalServerGuiClass',
+   '/Users/theodoreshih/Desktop/Work/OffloadPsiCal/dist/MacPSICalServerGuiClass',
+   'EXECUTABLE')],)

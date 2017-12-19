@@ -10,6 +10,8 @@ import sys
 import pexpect
 import Pmw
 import threading
+import os
+import sys
 
 class MainW(Tk):
     def __init__(self,parent):
@@ -42,7 +44,7 @@ class MainW(Tk):
         help_2 = "2. If this is your first time setting up or if you are switching to another computer, set a custom ip address.\n"
         help_3 = "3. On the raspberry pi, check the box to process on computer.\n"
         help_4 = "4. On the raspberry pi, go to the settings page and enter the ip address displayed on the computer.\n"
-        help_5 = "5. Click start before running PSI Calibration on the raspberry pi.\n"
+        help_5 = "5. On the computer, click start before running PSI Calibration on the raspberry pi.\n"
         help_6 = "6. After calibration is complete, click stop to stop the program."
         help_messages = help_title + help_1 + help_2 + help_3 + help_4 + help_5 + help_6
         self.balloon.bind(self.help, help_messages)
@@ -97,7 +99,9 @@ class MainW(Tk):
         serverSocket.bind(('', TCP_PORT))
         print("Socket hostname:", socket.gethostname())
 
+        # Stay in this loop while the thread attribute is true
         while self.thread.do_run:
+            # Want to catch timeout error
             try:
                 # Become a server socket
                 serverSocket.listen(1)
@@ -109,21 +113,24 @@ class MainW(Tk):
                 # When connection has been established and data is transferring, disable stop button
                 self.stop_button.config(state=DISABLED)
 
+                self.message.set("Receiving data from pi")
+                self.update()
                 data = ""
                 while 1:
-                    # Put in try/except block to wait for resource to free up
+                    # Let the socket sleep during exeption to free up resource
                     try:
                         data += clientsocket.recv(BUFFER_SIZE)
                         if not data: break
                         if data[-3:] == 'END': break
                     except socket.error, e:
-                        if str(e) == "[Errno 35] Resource temporarily unavailable":
+                        # Handle resource temporarily unavilable exception
+                        if "[Errno 35]" in str(e):
                             time.sleep(0.1)
+                        # Handle address already in use error
                         elif "[Errno 10035]" in str(e):
                             time.sleep(0.1)
                         else:
                             raise e
-                            #continue
 
                 clientsocket.close()
                 # print "Data:", data
@@ -139,11 +146,11 @@ class MainW(Tk):
                 pi_eth_ip = parameters[6]
                 print("Parameters:", (width, desiredWidth, spsi, ppmm, margin))
 
+                # Decode the image data
                 decoded_data = base64.b64decode(image)
-                #print "Decoded data:", decoded_data
-
                 # Create writable image and write the decoding result
-                image_result = open('image_decode.png', 'wb')
+                #image_result = open('image_decode.png', 'wb')
+                image_result = open(os.path.join(sys._MEIPASS, 'image_decode.png'), 'wb')
                 image_result.write(decoded_data)
 
                 return (width, desiredWidth, spsi, ppmm, margin, pi_eth_ip)
@@ -153,11 +160,24 @@ class MainW(Tk):
     # Run psi cal and get the values
     def psi_cal(self, width, desiredWidth, spsi, ppmm, margin):
         print("Running PSI Calibration Code...")
+        self.message.set("Running PSI calibration algorithm")
+        self.update()
+
         start_time = time.time()
-        offset_list = check_output(['python', 'saveme1.py', '--image', 'image_decode.png', '--width', width, '--desiredwidth', desiredWidth, '--spsi', spsi, '--ppmm', ppmm, '--margin', margin])
-        print("PSI Calibration Code took", time.time() - start_time, "seconds")
-        print("Output:", offset_list)
-        return offset_list
+        # Want to catch excpetion when there is a bad picture
+        try:
+            offset_list = check_output(['python', 'saveme1.py', '--image', 'image_decode.png', '--width', width, '--desiredwidth', desiredWidth, '--spsi', spsi, '--ppmm', ppmm, '--margin', margin])
+            offset_list = check_output([os.path.join(sys._MEIPASS, 'saveme1'), '--image', os.path.join(sys._MEIPASS, 'image_decode.png'), '--width', width, '--desiredwidth', desiredWidth, '--spsi', spsi, '--ppmm', ppmm, '--margin', margin])
+
+            print("PSI calibration code took", time.time() - start_time, "seconds")
+            print("Output:", offset_list)
+            return offset_list
+        except Exception as e:
+            print "Algorithm failed. Please restart PSI calibration."
+            print e
+            self.message.set("Algorithm failed. Please restart PSI calibration.")
+            self.update()
+            self.stop_button.config(state=NORMAL)
 
     # Becomes client and sends the values back to the pi
     def send_to_pi(self, TCP_IP, TCP_PORT, offset_list):
@@ -236,7 +256,7 @@ class MainW(Tk):
         self.set_ip_button.config(state=DISABLED)
         while self.get_ip() == "N/A":
             if time.time() - start_time > 5:
-                self.message.set("Unable to set Ip, make sure Ethernet cable is connected")
+                self.message.set("Unable to set Ip, make sure ethernet cable is connected")
                 self.update()
                 break
             self.get_ip()
@@ -245,6 +265,7 @@ class MainW(Tk):
 
     # Runs the entire script when start is clicked
     def run_script(self):
+        # Configure GUI
         self.start_button.config(state=DISABLED)
         self.enter_ip.config(state=DISABLED)
         self.set_ip_button.config(state=DISABLED)
@@ -263,16 +284,22 @@ class MainW(Tk):
     # Thread that runs server
     def run(self):
         self.currThread = threading.currentThread()
+        # Run script while the thread attribute is true
         while getattr(self.currThread, "do_run", True):
+            # Want to catch return value error when thread ends and break loop
             try:
                 (self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin, self.pi_eth_ip) = self.read_from_pi(self.TCP_PORT, self.BUFFER_SIZE)
+                self.offset_list = self.psi_cal(self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin)
+                self.send_to_pi(self.pi_eth_ip, self.TCP_PORT , self.offset_list)
+
+                self.message.set("PSI calibration is finished")
+                self.update()
             except TypeError, e:
                 print "Error:", e
                 break
-            self.offset_list = self.psi_cal(self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin)
-            self.send_to_pi(self.pi_eth_ip, self.TCP_PORT , self.offset_list)
 
             self.stop_button.config(state=NORMAL)
+
 
     # Stops the thread process when stop is clicked
     def stop_script(self):
@@ -288,8 +315,9 @@ class MainW(Tk):
         self.message.set("Stopped server")
         self.update()
 
-
+# Checks if current user is running as admin
 def isUserAdmin():
+    # Check types of operating systems
     if os.name == 'nt':
         import ctypes
         # WARNING: requires Windows XP SP2 or higher!
@@ -305,7 +333,9 @@ def isUserAdmin():
     else:
         raise RuntimeError, "Unsupported operating system for this module: %s" % (os.name,)
 
+# Executes command prompt as admin and re-runs script
 def runAsAdmin(cmdLine=None, wait=True):
+    # Check if operating system is windows
     if os.name != 'nt':
         raise RuntimeError, "This function is only implemented on Windows."
 
@@ -315,14 +345,15 @@ def runAsAdmin(cmdLine=None, wait=True):
 
     python_exe = sys.executable
 
+    # Save command to be re-run again
     if cmdLine is None:
         cmdLine = [python_exe] + sys.argv
     elif type(cmdLine) not in (types.TupleType,types.ListType):
         raise ValueError, "cmdLine is not a sequence."
     cmd = '"%s"' % (cmdLine[0],)
-    # XXX TODO: isn't there a function or something we can call to massage command line params?
+
     params = " ".join(['"%s"' % (x,) for x in cmdLine[1:]])
-    cmdDir = ''
+
     showCmd = win32con.SW_SHOWNORMAL
     #showCmd = win32con.SW_HIDE
     lpVerb = 'runas'  # causes UAC elevation prompt.
@@ -332,7 +363,6 @@ def runAsAdmin(cmdLine=None, wait=True):
     # ShellExecute() doesn't seem to allow us to fetch the PID or handle
     # of the process, so we can't get anything useful from it. Therefore
     # the more complex ShellExecuteEx() must be used.
-
     procInfo = ShellExecuteEx(nShow=showCmd,
                               fMask=shellcon.SEE_MASK_NOCLOSEPROCESS,
                               lpVerb=lpVerb,

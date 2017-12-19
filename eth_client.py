@@ -22,7 +22,7 @@ def send_to_computer(TCP_IP, TCP_PORT, pi_eth_ip, IMAGE_FILE, parameters):
         encoded_string = base64.b64encode(image_file.read())
 
     # Create an INET, STREAMing socket and connect to TCP_IP on port TCP_PORT
-    
+
     clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     if in_development: print "Connecting to", TCP_IP, "at port", TCP_PORT
     clientSocket.connect((TCP_IP, TCP_PORT))
@@ -97,7 +97,7 @@ def set_ip_ip(begin_comp_ip):
     hasInterface = False
     lines = []
     with open("/etc/dhcpcd.conf", "r") as f:
-        
+
         for line in f:
             if re.match(r"\binterface eth0\b", line):
                 hasInterface = True
@@ -149,25 +149,25 @@ if __name__ == '__main__':
 
     # Get/Set variables
     pi_eth_ip = get_pi_eth_ip()
-    
+
     # Check if first 3 numbers if comp ip matches pi ip
     begin_pi_ip = pi_eth_ip.split(".")[:-1]
     begin_pi_ip = ".".join(begin_pi_ip)
     begin_comp_ip = args["ip"].split(".")[:-1]
     begin_comp_ip = ".".join(begin_comp_ip)
-    
+
     # Change the pi's ip address if beginning ip's dont match
     if begin_pi_ip != begin_comp_ip:
         new_ip = set_ip_ip(begin_comp_ip)
         print "Pi's ip changed to", new_ip
-    
+
     TCP_IP = args["ip"]
     BUFFER_SIZE = 1024
     TCP_PORT = 5050
 
     # Format parameters to send to computer
     parameters = "," + str(args["width"]) + "," + str(args["desiredwidth"]) + "," + str(args["spsi"]) + "," + str(args["ppmm"]) + "," + str(args["margin"])
-    if in_development: print parameters
+    #if in_development: print parameters
 
     # Becomes client and sends data to computer
     send_to_computer(TCP_IP, TCP_PORT, pi_eth_ip, args["image"], parameters)
