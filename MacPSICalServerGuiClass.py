@@ -1,4 +1,3 @@
-
 from Tkinter import *
 import socket
 import base64
@@ -18,9 +17,6 @@ class MainW(Tk):
         self.geometry("400x130")
         self.TCP_PORT = 5050
         self.BUFFER_SIZE = 1024
-
-        self.curr_dir = os.getcwd()
-        print self.curr_dir
 
         # Initialize messages to display to user
         self.message = StringVar()
@@ -89,7 +85,7 @@ class MainW(Tk):
         self.feedback.grid(row=4, column=0, padx=20)
 
     # Becomes server and gets the parameters and ip from pi
-    def read_from_pi(self, TCP_PORT, BUFFER_SIZE):
+    def read_from_pi(self):
         print("Starting socket connection")
         # Create an INET, STREAMing socket
         serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -99,7 +95,7 @@ class MainW(Tk):
         serverSocket.settimeout(3)
         # Bind the socket to host and a port.
         # '' means socket is reachable by any address the machine happens to have
-        serverSocket.bind(('', TCP_PORT))
+        serverSocket.bind(('', self.TCP_PORT))
         print("Socket hostname:", socket.gethostname())
 
         # Stay in this loop while the thread attribute is true
@@ -122,7 +118,7 @@ class MainW(Tk):
                 while 1:
                     # Let the socket sleep during exeption to free up resource
                     try:
-                        data += clientsocket.recv(BUFFER_SIZE)
+                        data += clientsocket.recv(self.BUFFER_SIZE)
                         if not data: break
                         if data[-3:] == 'END': break
                     except socket.error, e:
@@ -139,30 +135,31 @@ class MainW(Tk):
                 # print "Data:", data
 
                 # Organize data into variables
-                parameters = data.split(',')
-                image = parameters[0]
-                width = parameters[1]
-                desiredWidth = parameters[2]
-                spsi = parameters[3]
-                ppmm = parameters[4]
-                margin = parameters[5]
-                pi_eth_ip = parameters[6]
-                print("Parameters:", (width, desiredWidth, spsi, ppmm, margin))
+                self.parameters = data.split(',')
+                self.image = self.parameters[0]
+                self.width = self.parameters[1]
+                self.desiredWidth = self.parameters[2]
+                self.spsi = self.parameters[3]
+                self.ppmm = self.parameters[4]
+                self.margin = self.parameters[5]
+                self.pi_eth_ip = self.parameters[6]
+                print("Parameters:", (self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin))
 
                 # Decode the image data
-                decoded_data = base64.b64decode(image)
+                decoded_data = base64.b64decode(self.image)
                 # Create writable image and write the decoding result
                 #image_result = open('image_decode.png', 'wb')
                 image_result = open(os.path.join(sys._MEIPASS, 'image_decode.png'), 'wb')
                 image_result.write(decoded_data)
+                break
 
-                return (width, desiredWidth, spsi, ppmm, margin, pi_eth_ip)
+                #return (self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin, self.pi_eth_ip)
             except socket.error, e:
                 print "Error:", e
 
 
     # Run psi cal and get the values
-    def psi_cal(self, width, desiredWidth, spsi, ppmm, margin):
+    def psi_cal(self):
         print("Running PSI Calibration Code...")
         self.message.set("Running PSI calibration algorithm")
         self.update()
@@ -171,11 +168,12 @@ class MainW(Tk):
         # Want to catch excpetion when there is a bad picture
         try:
             #offset_list = check_output(['/Users/theodoreshih/Desktop/Work/PyInstallerMac/dist/MacPSICalServerGuiClass.app/Contents/Resources/saveme1', '--image', '/Users/theodoreshih/Desktop/Work/PyInstallerMac/dist/MacPSICalServerGuiClass.app/Contents/Resources/image_decode.png', '--width', width, '--desiredwidth', desiredWidth, '--spsi', spsi, '--ppmm', ppmm, '--margin', margin])
-            offset_list = check_output([os.path.join(sys._MEIPASS, 'saveme1'), '--image', os.path.join(sys._MEIPASS, 'image_decode.png'), '--width', width, '--desiredwidth', desiredWidth, '--spsi', spsi, '--ppmm', ppmm, '--margin', margin])
+            #self.offset_list = check_output(['./saveme1', '--image', 'image_decode.png', '--width', self.width, '--desiredwidth', self.desiredWidth, '--spsi', self.spsi, '--ppmm', self.ppmm, '--margin', self.margin])
+            self.offset_list = check_output([os.path.join(sys._MEIPASS, 'saveme1'), '--image', os.path.join(sys._MEIPASS, 'image_decode.png'), '--width', self.width, '--desiredwidth', self.desiredWidth, '--spsi', self.spsi, '--ppmm', self.ppmm, '--margin', self.margin])
 
             print("PSI calibration code took", time.time() - start_time, "seconds")
-            print("Output:", offset_list)
-            return offset_list
+            print("Output:", self.offset_list)
+            #return offset_list
         except Exception as e:
             print "Algorithm failed. Please restart PSI calibration."
             print e
@@ -185,19 +183,19 @@ class MainW(Tk):
 
 
     # Becomes client and sends the values back to the pi
-    def send_to_pi(self, TCP_IP, TCP_PORT, offset_list):
+    def send_to_pi(self):
         # Format data to send to pi
-        offset_list = offset_list[1:-2]
-        offset_list += "END"
-        print("Data to send:", offset_list)
+        self.offset_list = self.offset_list[1:-2]
+        self.offset_list += "END"
+        print("Data to send:", self.offset_list)
 
         # Creating socket connection to send data
         print("Sending data back to PI...")
         clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        print "Connecting to", TCP_IP, "at port", TCP_PORT
-        clientSocket.connect((TCP_IP, TCP_PORT))
+        print "Connecting to", self.pi_eth_ip, "at port", self.TCP_PORT
+        clientSocket.connect((self.pi_eth_ip, self.TCP_PORT))
         start_time = time.time()
-        clientSocket.send(offset_list)
+        clientSocket.send(self.offset_list)
         clientSocket.close()
         print("Successfully sent data in", time.time() - start_time, "seconds")
 
@@ -298,9 +296,9 @@ class MainW(Tk):
         while getattr(self.currThread, "do_run", True):
             # Want to catch return value error when thread ends and break loop
             try:
-                (self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin, self.pi_eth_ip) = self.read_from_pi(self.TCP_PORT, self.BUFFER_SIZE)
-                self.offset_list = self.psi_cal(self.width, self.desiredWidth, self.spsi, self.ppmm, self.margin)
-                self.send_to_pi(self.pi_eth_ip, self.TCP_PORT , self.offset_list)
+                self.read_from_pi()
+                self.psi_cal()
+                self.send_to_pi()
 
                 self.message.set("PSI calibration is finished")
                 self.update()
@@ -323,7 +321,6 @@ class MainW(Tk):
         threading.Thread.join(self.thread, 1)
         self.message.set("Stopped server")
         self.update()
-
 
 
 if __name__ == "__main__":

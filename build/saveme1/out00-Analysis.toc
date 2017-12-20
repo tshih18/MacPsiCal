@@ -1,4 +1,4 @@
-(['/Users/theodoreshih/Desktop/Work/OffloadPsiCal/saveme1.py'],
+(['saveme1.py'],
  ['/Users/theodoreshih/Desktop/Work/OffloadPsiCal',
   '/Users/theodoreshih/Desktop/Work/OffloadPsiCal'],
  ['scipy._lib.messagestream', 'codecs'],

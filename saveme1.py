@@ -451,4 +451,6 @@ def main():
 	#return info
 
 if __name__ == '__main__':
+	# Need this line for multiprocessing to work on windows
+	multiprocessing.freeze_support()
 	main()
