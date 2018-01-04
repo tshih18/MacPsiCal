@@ -323,8 +323,8 @@ class Left_Frame(Frame):
                 f.close()
 
         # Reboot pi
-        #child = pexpect.spawn("sudo reboot")
-        #child.expect(pexpect.EOF)
+        child = pexpect.spawn("sudo reboot")
+        child.expect(pexpect.EOF)
 
     # Close window when back button is clicked
     def exit_settings(self):
